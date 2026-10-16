@@ -1,0 +1,13 @@
+{
+	"schemaVersion": 1,
+	"id": "kro-gametest",
+	"version": "1.0.0",
+	"name": "Kro Visual Tests",
+	"environment": "client",
+	"entrypoints": {
+		"fabric-client-gametest": ["dev.kro.test.KroScreenshotTest"]
+	},
+	"depends": {
+		"kro": "*"
+	}
+}
