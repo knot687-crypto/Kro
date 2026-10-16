@@ -44,15 +44,13 @@ public final class PreviewMenu {
 			// mirrors WallpaperTexture.build
 			long t0 = System.nanoTime();
 			Picture source = Picture.read(new FileInputStream(wallpaperPath));
-			int w = KroMenu.windowPixelWidth(gw, gh, gs);
-			int h = Math.max(1, Math.round(w / source.aspect()));
-			Picture sharp = source.resize(w, h);
-			int fw = Math.max(1, w / 2), fh = Math.max(1, h / 2);
-			Picture frost = sharp.resize(fw, fh).blur(9f * fw / 744f).glassTone(0.035f, 0.14f, 1.18f);
-			float[] focus = source.focus();
-			System.out.printf("wallpaper %dx%d -> %dx%d (+frost %dx%d) in %.0f ms, focus %.3f, %.3f%n", source.width, source.height,
-					w, h, fw, fh, (System.nanoTime() - t0) / 1e6, focus[0], focus[1]);
-			menu.setWallpaper(new Wallpaper(PreviewImage.of(sharp), PreviewImage.of(frost), w, h, focus[0], focus[1]));
+			int[] box = KroMenu.windowPixelSize(gw, gh, gs);
+			float fit = Math.min(box[0] / (float) source.width, box[1] / (float) source.height);
+			int w = Math.max(1, Math.round(source.width * fit)), h = Math.max(1, Math.round(source.height * fit));
+			Picture sharp = source.resize(w, h).fadeEdges(0.22f, 0.04f);
+			Picture tinted = sharp.tint(0.05f, 0.20f, 1.10f);
+			System.out.printf("wallpaper %dx%d -> %dx%d in %.0f ms%n", source.width, source.height, w, h, (System.nanoTime() - t0) / 1e6);
+			menu.setWallpaper(new Wallpaper(PreviewImage.of(sharp), PreviewImage.of(tinted), w, h));
 		}
 		Canvas canvas = new Canvas();
 		SoftwareBackend scratch = new SoftwareBackend(4, 4, gs);

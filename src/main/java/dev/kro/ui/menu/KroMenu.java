@@ -40,8 +40,6 @@ public final class KroMenu {
 	private static final float RADIUS = 16f;
 	private static final float MAX_W = 744f;
 	private static final float MAX_H = 460f;
-	/** Where the picture's focus (the subject's face) sits, as a fraction of the window height. */
-	private static final float FOCUS_AT = 0.40f;
 	private static final String[] TABS = {"All", "Combat", "Movement", "Visual", "Client"};
 
 	private final ModuleRegistry modules;
@@ -60,8 +58,6 @@ public final class KroMenu {
 	private final Anim searchHover = new Anim(0f, 16f);
 	private final Anim emptyAnim = new Anim(0f, 12f);
 	private final Anim statusSwap = new Anim(1f, 16f);
-	private final Spring reveal = new Spring(0f, Spring.GENTLE);
-	private final Anim drift = new Anim(0f, 2.5f);
 	private final Glass glass = new Glass();
 	private final long openedAt = Clock.nanos();
 
@@ -127,10 +123,16 @@ public final class KroMenu {
 		return Math.max(0.45f, Math.min(guiW / DESIGN_W, guiH / DESIGN_H) * uiScale);
 	}
 
-	/** The window's width in physical pixels: the width to resample the window picture to. */
-	public static int windowPixelWidth(float guiW, float guiH, float guiScale) {
+	/**
+	 * The window's size in physical pixels when it shows a picture ({width, height}): the box the
+	 * picture is fitted into whole, and so the size it is resampled to.
+	 */
+	public static int[] windowPixelSize(float guiW, float guiH, float guiScale) {
 		float u = designScale(guiW, guiH, 1f);
-		return Math.max(1, Math.round(Math.min(MAX_W, guiW / u - 48f) * u * guiScale));
+		float px = u * guiScale;
+		float w = Math.min(MAX_W, guiW / u - 48f);
+		float h = Math.min(MAX_H, guiH / u - 48f);
+		return new int[] {Math.max(1, Math.round(w * px)), Math.max(1, Math.round(h * px))};
 	}
 
 	private static float snap(float v, float px) {
@@ -178,10 +180,12 @@ public final class KroMenu {
 		c.rect(0f, 0f, dw, dh, 0f, Colors.withAlpha(0x000000, dim * o));
 
 		float px = u * c.guiScale();
+		boolean picture = wallpaper != null && wallpaper.ready();
 		List<ModuleCard> visibleCards = filtered();
 		float maxH = Math.min(MAX_H, dh - 48f);
 		float target = HEADER + 1f + FOOTER + (page != null ? page.contentHeight() : gridHeight(visibleCards.size()));
-		target = Math.min(maxH, target);
+		// with a picture the window keeps its full height, so the picture is shown whole and still
+		target = picture ? maxH : Math.min(maxH, target);
 		if (!heightPlaced) {
 			height.snap(target);
 			heightPlaced = true;
@@ -196,12 +200,10 @@ public final class KroMenu {
 		float e = Ease.outCubic(o);
 		c.translate(0f, (1f - e) * 12f);
 		c.scale(0.965f + 0.035f * e, wx + ww / 2f, wy + wh / 2f);
-		boolean picture = wallpaper != null && wallpaper.ready();
 		if (picture) {
-			drawPictureWindow(c, px, maxH);
+			drawPictureWindow(c, px);
 		} else {
 			glass.clear();
-			reveal.snap(0f);
 			Draw.window(c, wx, wy, ww, wh, RADIUS);
 			c.rect(wx + 1f, wy + 1f, ww - 2f, HEADER, RADIUS - 1f, 0x08FFFFFF, 0x08FFFFFF, 0x00FFFFFF, 0x00FFFFFF);
 		}
@@ -217,48 +219,38 @@ public final class KroMenu {
 	}
 
 	/**
-	 * The window filled with the picture: covered at the window's tallest so it holds still while
-	 * the window resizes, placed so the subject's face sits in view, drawn one texel per pixel
-	 * once settled. It eases in with a slow settle; a settings page frosts it for focus.
+	 * The window with the picture shown whole: fitted inside, never cropped or enlarged, centred,
+	 * and drawn one texel per pixel. Its edges were faded to black, so beyond them the window is
+	 * that same black with no seam, and the whole window is one draw.
 	 */
-	private void drawPictureWindow(Canvas c, float px, float maxH) {
+	private void drawPictureWindow(Canvas c, float px) {
 		Wallpaper wp = wallpaper;
-		float settle = Ease.outCubic(Math.max(0f, Math.min(1f, reveal.to(1f).get())));
-		float pw = Math.max(ww, maxH * wp.aspect());
-		float ph = pw / wp.aspect();
-		if (Math.abs(wp.pixelWidth() - pw * px) <= 1.5f) {
+		float pw, ph;
+		if (Math.abs(wp.pixelHeight() - wh * px) <= 1.5f || Math.abs(wp.pixelWidth() - ww * px) <= 1.5f) {
 			pw = wp.pixelWidth() / px;
 			ph = wp.pixelHeight() / px;
+		} else {
+			float fit = Math.min(ww / wp.aspect(), wh);
+			ph = fit;
+			pw = fit * wp.aspect();
 		}
-		float zoom = 1f + 0.06f * (1f - settle);
-		pw *= zoom;
-		ph *= zoom;
-		float shift = drift.to(interactive() ? (0.5f - mouse.x / Math.max(1f, dw)) * 6f : 0f).get();
-		float ox = wx + ww * 0.5f - wp.focusX() * pw;
-		float oy = wy + maxH * FOCUS_AT - wp.focusY() * ph;
-		ox = Math.max(wx + ww - pw, Math.min(wx, ox)) + shift;
-		oy = Math.max(wy + maxH - ph, Math.min(wy, oy));
-		if (settle > 0.999f) {
-			ox = snap(ox, px);
-			oy = snap(oy, px);
-		}
-		glass.set(wp.glass(), ox, oy, pw, ph);
+		float ox = snap(wx + (ww - pw) / 2f, px);
+		float oy = snap(wy + (wh - ph) / 2f, px);
+		glass.set(wp.tinted(), ox, oy, pw, ph);
 
 		// lift off the game
 		c.shadow(wx, wy + 20f, ww, wh, RADIUS, 48f, 0xA6000000);
 		c.shadow(wx, wy + 3f, ww, wh, RADIUS, 8f, 0x59000000);
 		c.image(wp.image(), wx, wy, ww, wh, RADIUS, 0xFFFFFFFF, (wx - ox) / pw, (wy - oy) / ph, (wx + ww - ox) / pw, (wy + wh - oy) / ph);
 
-		// a settings page frosts the whole picture so its rows read cleanly
+		// a settings page tints the whole picture (still sharp) so its rows read cleanly
 		float focus = Math.max(0f, Math.min(1f, pageAnim.get()));
 		if (focus > 0.005f) {
-			glass.fill(c, wx, wy, ww, wh, RADIUS, Colors.withAlpha(0xFFFFFF, 0.94f * focus));
+			glass.fill(c, wx, wy, ww, wh, RADIUS, Colors.withAlpha(0xFFFFFF, focus));
+			c.rect(wx, wy, ww, wh, RADIUS, Colors.withAlpha(0x000000, 0.18f * focus));
 		}
-		// shading: deep at the bars, a breath of darkness overall, light falling from the top
-		c.rect(wx, wy, ww, wh, RADIUS, Colors.withAlpha(0x000000, 0.10f + 0.16f * focus));
-		c.rectV(wx, wy, ww, HEADER + 40f, RADIUS, 0x99000000, 0x00000000);
-		c.rectV(wx, wy + wh - FOOTER - 44f, ww, FOOTER + 44f, RADIUS, 0x00000000, 0xA6000000);
-		c.rectV(wx, wy, ww, wh * 0.5f, RADIUS, 0x0AFFFFFF, 0x00FFFFFF);
+		// shading under the footer, where the picture is brightest
+		c.rectV(wx, wy + wh - FOOTER - 56f, ww, FOOTER + 56f, RADIUS, 0x00000000, 0xB3000000);
 	}
 
 	/** Two hairlines: a bright outer rim catching light from above and a faint inner one. */

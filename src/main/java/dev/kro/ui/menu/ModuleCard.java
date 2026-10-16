@@ -15,7 +15,7 @@ import java.util.List;
 
 /**
  * One module tile in the grid: name and switch on top, a short description, then category and
- * key bind. Over a window picture it is frosted glass showing exactly the picture behind it.
+ * key bind. Over a window picture it is clear tinted glass showing exactly the picture behind it.
  * Positions glide on springs when the grid is filtered.
  */
 final class ModuleCard {
@@ -127,9 +127,9 @@ final class ModuleCard {
 	}
 
 	/**
-	 * Frosted glass: the picture behind the card, blurred and tamed, under a smoke tint, a soft
-	 * sheen from above, an accent bloom when on, and a hairline rim that brightens toward the
-	 * cursor as if lit by it.
+	 * Clear tinted glass: the picture behind the card, just as sharp with its highlights tamed,
+	 * under a light smoke, a soft sheen from above, an accent bloom when on, and a hairline rim
+	 * that brightens toward the cursor as if lit by it.
 	 */
 	private void surfaceGlass(Canvas c, Mouse m, Glass glass, float px, float py, float scale, float lift, float hv, float onT) {
 		float sw = w * scale, sh = h * scale;
@@ -140,7 +140,7 @@ final class ModuleCard {
 			c.shadow(px, py, w, h, RADIUS, 16f, Theme.accent(0.16f * onT));
 		}
 		glass.fill(c, px, py, w, h, RADIUS, 0xFFFFFFFF, sx, sy, sw, sh);
-		c.rect(px, py, w, h, RADIUS, Colors.withAlpha(0x000000, 0.34f - 0.10f * hv));
+		c.rect(px, py, w, h, RADIUS, Colors.withAlpha(0x000000, 0.24f - 0.08f * hv));
 		c.rectV(px, py, w, h * 0.5f, RADIUS, Colors.withAlpha(0xFFFFFF, 0.05f + 0.03f * hv), 0x00FFFFFF);
 		if (onT > 0.01f) {
 			c.rect(px, py, w, h * 0.7f, RADIUS, Theme.accent(0.20f * onT), Theme.accent(0.07f * onT), 0x00000000, 0x00000000);

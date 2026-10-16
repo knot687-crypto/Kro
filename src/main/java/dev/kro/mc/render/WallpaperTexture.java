@@ -17,35 +17,28 @@ import java.nio.file.Path;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * The picture that fills the menu window. Decoded once, then for every window size resampled
- * on a worker thread to the window's exact pixel width, so it is drawn one texel per pixel and
- * stays crisp at any resolution, along with a frosted copy for the glass surfaces on top of it.
- * Only the GPU uploads happen on the render thread.
+ * The picture shown whole inside the menu window. Decoded once, then for every window size
+ * resampled on a worker thread to exactly the size it is shown at, so it is drawn one texel per
+ * pixel and stays crisp at any resolution, together with an equally sharp tinted copy for the
+ * glass surfaces on top of it. Only the GPU uploads happen on the render thread.
  * <p>
  * A {@code wallpaper.png} / {@code .jpg} in {@code config/kro} replaces the bundled picture.
  */
 public final class WallpaperTexture {
 	private static final String BUNDLED = "/assets/kro/wallpaper/default.png";
 	private static final String[] CUSTOM = {"wallpaper.png", "wallpaper.jpg", "wallpaper.jpeg"};
-	/** Frost blur in design units: the same softness on every screen. */
-	private static final float FROST = 9f;
-	/** The menu window's design width the frost is tuned at. */
-	private static final float DESIGN_WINDOW = 744f;
 
 	private final Path dir;
 	private Path customPath;
 	private long customStamp;
-	private CompletableFuture<Source> source;
+	private CompletableFuture<Picture> source;
 	private CompletableFuture<Sized> job;
-	private int builtWidth = -1;
+	private long builtFor = -1L;
 	private DynamicTexture texture;
-	private DynamicTexture glassTexture;
+	private DynamicTexture tintedTexture;
 	private Wallpaper current;
 
-	private record Source(Picture picture, float focusX, float focusY) {
-	}
-
-	private record Sized(NativeImage image, NativeImage glass, int width, int height, Source source) {
+	private record Sized(NativeImage image, NativeImage tinted, int width, int height, Picture source) {
 	}
 
 	/** A texture the GUI can draw directly. */
@@ -92,11 +85,11 @@ public final class WallpaperTexture {
 			customPath = path;
 			customStamp = stamp;
 			source = CompletableFuture.supplyAsync(() -> load(path));
-			builtWidth = -1;
+			builtFor = -1L;
 		}
 	}
 
-	private static Source load(Path custom) {
+	private static Picture load(Path custom) {
 		Picture picture = null;
 		if (custom != null) {
 			try (InputStream in = Files.newInputStream(custom)) {
@@ -115,23 +108,22 @@ public final class WallpaperTexture {
 				throw new IllegalStateException("Kro's bundled wallpaper is unreadable", e);
 			}
 		}
-		float[] focus = picture.focus();
-		return new Source(picture, focus[0], focus[1]);
+		return picture;
 	}
 
 	/**
-	 * The window picture for a window {@code pixelWidth} pixels wide: the previous size while a
-	 * new one is resampled, a wallpaper without images while the very first is prepared, and
-	 * {@code null} if no picture could be loaded at all.
+	 * The picture for a window of {@code boxWidth} x {@code boxHeight} pixels, fitted inside it
+	 * whole. Returns the previous size while a new one is resampled, a wallpaper without images
+	 * while the very first is prepared, and {@code null} if no picture could be loaded at all.
 	 */
-	public Wallpaper get(int pixelWidth) {
+	public Wallpaper get(int boxWidth, int boxHeight) {
 		if (source == null) {
 			refresh();
 		}
 		if (source.isCompletedExceptionally()) {
 			return null;
 		}
-		Source src = source.getNow(null);
+		Picture src = source.getNow(null);
 		if (src == null) {
 			return current;
 		}
@@ -142,25 +134,28 @@ public final class WallpaperTexture {
 				install(sized);
 			}
 		}
-		pixelWidth = Math.max(16, Math.min(pixelWidth, 8192));
-		if (builtWidth != pixelWidth && job == null) {
-			int w = pixelWidth;
-			int h = Math.max(1, Math.round(w / src.picture().aspect()));
+		int bw = Math.max(16, Math.min(boxWidth, 8192));
+		int bh = Math.max(16, Math.min(boxHeight, 8192));
+		long key = (long) bw << 32 | bh;
+		if (builtFor != key && job == null) {
+			// fit whole: as large as the window allows, never cropped
+			float fit = Math.min(bw / (float) src.width, bh / (float) src.height);
+			int w = Math.max(1, Math.round(src.width * fit));
+			int h = Math.max(1, Math.round(src.height * fit));
 			job = CompletableFuture.supplyAsync(() -> build(src, w, h));
 			if (current == null) {
-				current = new Wallpaper(null, null, w, h, src.focusX(), src.focusY());
+				current = new Wallpaper(null, null, w, h);
 			}
-			builtWidth = w;
+			builtFor = key;
 		}
 		return current;
 	}
 
-	private static Sized build(Source src, int w, int h) {
-		Picture sharp = src.picture().resize(w, h);
-		int gw = Math.max(1, w / 2), gh = Math.max(1, h / 2);
-		float sigma = FROST * gw / DESIGN_WINDOW;
-		Picture frost = sharp.resize(gw, gh).blur(sigma).glassTone(0.035f, 0.14f, 1.18f);
-		return new Sized(toNative(sharp), toNative(frost), w, h, src);
+	/** The picture at its shown size with edges melting to black, and its sharp tinted copy. */
+	private static Sized build(Picture src, int w, int h) {
+		Picture sharp = src.resize(w, h).fadeEdges(0.22f, 0.04f);
+		Picture tinted = sharp.tint(0.05f, 0.20f, 1.10f);
+		return new Sized(toNative(sharp), toNative(tinted), w, h, src);
 	}
 
 	private static NativeImage toNative(Picture p) {
@@ -179,20 +174,19 @@ public final class WallpaperTexture {
 		if (source.getNow(null) != sized.source()) {
 			// a newer picture replaced this one while it was being resampled
 			sized.image().close();
-			sized.glass().close();
+			sized.tinted().close();
 			return;
 		}
 		DynamicTexture sharp = new DynamicTexture(() -> "kro_wallpaper", sized.image());
-		DynamicTexture frost = new DynamicTexture(() -> "kro_wallpaper_glass", sized.glass());
+		DynamicTexture tinted = new DynamicTexture(() -> "kro_wallpaper_tinted", sized.tinted());
 		if (texture != null) {
 			texture.close();
 		}
-		if (glassTexture != null) {
-			glassTexture.close();
+		if (tintedTexture != null) {
+			tintedTexture.close();
 		}
 		texture = sharp;
-		glassTexture = frost;
-		Source src = sized.source();
-		current = new Wallpaper(new Image(sharp), new Image(frost), sized.width(), sized.height(), src.focusX(), src.focusY());
+		tintedTexture = tinted;
+		current = new Wallpaper(new Image(sharp), new Image(tinted), sized.width(), sized.height());
 	}
 }

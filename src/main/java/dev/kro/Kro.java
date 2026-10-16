@@ -89,7 +89,7 @@ public final class Kro implements ClientModInitializer {
 		jumpReset.endTick(mc);
 		if (modules.ui.window.is("Picture")) {
 			// keeps the picture decoded and sized for the current window, off the render thread
-			wallpaper.get(KroScreen.pictureWidth(mc));
+			KroScreen.picture(mc);
 		}
 		if (saveDue > 0L && System.currentTimeMillis() >= saveDue) {
 			saveDue = -1L;

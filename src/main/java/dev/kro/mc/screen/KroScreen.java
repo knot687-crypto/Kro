@@ -36,9 +36,10 @@ public final class KroScreen extends Screen {
 		return menu.cardCentre(index);
 	}
 
-	/** The menu window's width in physical pixels: the width its picture is resampled to. */
-	public static int pictureWidth(Minecraft mc) {
-		return KroMenu.windowPixelWidth(mc.getWindow().getGuiScaledWidth(), mc.getWindow().getGuiScaledHeight(), (float) mc.getWindow().getGuiScale());
+	/** The menu window's size in physical pixels: the box its picture is fitted into. */
+	public static Wallpaper picture(Minecraft mc) {
+		int[] box = KroMenu.windowPixelSize(mc.getWindow().getGuiScaledWidth(), mc.getWindow().getGuiScaledHeight(), (float) mc.getWindow().getGuiScale());
+		return Kro.get().wallpaper.get(box[0], box[1]);
 	}
 
 	/** Whether the Kro menu is on screen (used to drive the background blur). */
@@ -71,7 +72,7 @@ public final class KroScreen extends Screen {
 	public void renderBackground(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
 		Kro kro = Kro.get();
 		Interface ui = kro.modules.ui;
-		wallpaper = ui.window.is("Picture") ? kro.wallpaper.get(pictureWidth(Minecraft.getInstance())) : null;
+		wallpaper = ui.window.is("Picture") ? picture(Minecraft.getInstance()) : null;
 		// the game stays visible behind the menu
 		if (ui.blur.intValue() > 0) {
 			this.renderBlurredBackground(graphics);

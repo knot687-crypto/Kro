@@ -30,6 +30,14 @@ public final class PreviewImage implements ImageRef {
 		return image;
 	}
 
+	BufferedImage image() {
+		return image;
+	}
+
+	boolean smooth() {
+		return smooth;
+	}
+
 	float[] sample(float u, float v) {
 		int w = image.getWidth(), h = image.getHeight();
 		if (!smooth) {

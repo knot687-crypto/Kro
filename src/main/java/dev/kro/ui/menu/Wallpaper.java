@@ -3,22 +3,20 @@ package dev.kro.ui.menu;
 import dev.kro.ui.render.ImageRef;
 
 /**
- * The picture that fills the menu window, behind the interface.
+ * The picture shown whole inside the menu window, behind the interface.
  *
- * @param image       the picture itself, ideally resampled to the window's exact pixel width
- * @param glass       a blurred, highlight-tamed copy that glass surfaces show through
- * @param pixelWidth  texel width of {@code image}; drawn one texel per pixel when it matches
- * @param pixelHeight texel height of {@code image}
- * @param focusX      where the eye goes (the subject's head), as a fraction of the width
- * @param focusY      where the eye goes, as a fraction of the height
+ * @param image       the picture itself, resampled to the exact pixel size it is shown at
+ * @param tinted      the same picture, equally sharp, with highlights tamed for glass surfaces
+ * @param pixelWidth  texel width of both images; drawn one texel per pixel when it matches
+ * @param pixelHeight texel height of both images
  */
-public record Wallpaper(ImageRef image, ImageRef glass, int pixelWidth, int pixelHeight, float focusX, float focusY) {
+public record Wallpaper(ImageRef image, ImageRef tinted, int pixelWidth, int pixelHeight) {
 	/** Width over height. */
 	public float aspect() {
 		return pixelWidth / (float) pixelHeight;
 	}
 
 	public boolean ready() {
-		return image != null && glass != null;
+		return image != null && tinted != null;
 	}
 }

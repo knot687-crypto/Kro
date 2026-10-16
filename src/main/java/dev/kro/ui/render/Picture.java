@@ -12,8 +12,7 @@ import java.util.Arrays;
 
 /**
  * A decoded ARGB picture with a high quality resampler, so a wallpaper can be shown at exactly
- * one texel per screen pixel at any resolution, plus a locator for the subject of a photo shot
- * against a dark backdrop.
+ * one texel per screen pixel at any resolution, and the tone used for clear glass over it.
  */
 public final class Picture {
 	private static final int SRGB_STEPS = 16384;
@@ -223,101 +222,52 @@ public final class Picture {
 		}
 	}
 
-	// ------------------------------------------------------------------ glass
-
 	/**
-	 * Gaussian blur (three box passes) in linear light on premultiplied colour, so bright detail
-	 * spreads the way light does instead of turning muddy.
+	 * Fades the outermost margins to pure black (smoothly, in linear light) so the picture melts
+	 * into a black window with no visible edge, and sampling beyond it returns exact black.
 	 */
-	public Picture blur(float sigma) {
-		int n = width * height;
-		float[][] ch = new float[4][n];
-		for (int i = 0; i < n; i++) {
-			int c = argb[i];
-			float a = (c >>> 24) / 255f;
-			ch[0][i] = TO_LINEAR[(c >> 16) & 255] * a;
-			ch[1][i] = TO_LINEAR[(c >> 8) & 255] * a;
-			ch[2][i] = TO_LINEAR[c & 255] * a;
-			ch[3][i] = a;
-		}
-		if (sigma > 0.25f) {
-			float[] tmp = new float[n];
-			for (int size : boxSizes(sigma)) {
-				int r = (size - 1) / 2;
-				for (float[] plane : ch) {
-					boxRows(plane, tmp, width, height, r);
-					boxColumns(tmp, plane, width, height, r);
+	public Picture fadeEdges(float marginX, float marginY) {
+		float[] fx = ramp(width, marginX);
+		float[] fy = ramp(height, marginY);
+		int[] out = new int[argb.length];
+		for (int y = 0; y < height; y++) {
+			int row = y * width;
+			for (int x = 0; x < width; x++) {
+				int c = argb[row + x];
+				float k = fx[x] * fy[y];
+				if (k >= 1f) {
+					out[row + x] = c;
+					continue;
 				}
+				out[row + x] = (c & 0xFF000000)
+						| srgb(TO_LINEAR[(c >> 16) & 255] * k) << 16
+						| srgb(TO_LINEAR[(c >> 8) & 255] * k) << 8
+						| srgb(TO_LINEAR[c & 255] * k);
 			}
-		}
-		int[] out = new int[n];
-		for (int i = 0; i < n; i++) {
-			float a = ch[3][i];
-			int alpha = Math.round(Math.min(1f, a) * 255f);
-			if (alpha <= 0) {
-				continue;
-			}
-			float inv = 1f / a;
-			out[i] = alpha << 24 | srgb(ch[0][i] * inv) << 16 | srgb(ch[1][i] * inv) << 8 | srgb(ch[2][i] * inv);
 		}
 		return new Picture(width, height, out);
 	}
 
-	/** Box widths whose three passes approximate a Gaussian of {@code sigma} (Kutskir). */
-	private static int[] boxSizes(float sigma) {
-		int n = 3;
-		double ideal = Math.sqrt(12.0 * sigma * sigma / n + 1.0);
-		int lower = (int) Math.floor(ideal);
-		if (lower % 2 == 0) {
-			lower--;
-		}
-		int upper = lower + 2;
-		double m = (12.0 * sigma * sigma - n * lower * lower - 4.0 * n * lower - 3.0 * n) / (-4.0 * lower - 4.0);
-		long small = Math.round(m);
-		int[] sizes = new int[n];
+	/** 0 at both ends rising smoothly to 1 over {@code margin} of the length; the very edge is 0. */
+	private static float[] ramp(int n, float margin) {
+		float[] r = new float[n];
+		float m = Math.max(1f, margin * n);
 		for (int i = 0; i < n; i++) {
-			sizes[i] = i < small ? lower : upper;
+			float d = Math.min(i, n - 1 - i) / m;
+			float t = Math.max(0f, Math.min(1f, d));
+			r[i] = t * t * (3f - 2f * t);
 		}
-		return sizes;
+		return r;
 	}
 
-	private static void boxRows(float[] src, float[] dst, int w, int h, int r) {
-		float inv = 1f / (2 * r + 1);
-		for (int y = 0; y < h; y++) {
-			int row = y * w;
-			float first = src[row];
-			float acc = (r + 1) * first;
-			for (int j = 0; j < r; j++) {
-				acc += src[row + Math.min(j, w - 1)];
-			}
-			for (int x = 0; x < w; x++) {
-				acc += src[row + Math.min(x + r, w - 1)] - src[row + Math.max(x - r - 1, 0)];
-				dst[row + x] = acc * inv;
-			}
-		}
-	}
-
-	private static void boxColumns(float[] src, float[] dst, int w, int h, int r) {
-		float inv = 1f / (2 * r + 1);
-		for (int x = 0; x < w; x++) {
-			float first = src[x];
-			float acc = (r + 1) * first;
-			for (int j = 0; j < r; j++) {
-				acc += src[Math.min(j, h - 1) * w + x];
-			}
-			for (int y = 0; y < h; y++) {
-				acc += src[Math.min(y + r, h - 1) * w + x] - src[Math.max(y - r - 1, 0) * w + x];
-				dst[y * w + x] = acc * inv;
-			}
-		}
-	}
+	// ------------------------------------------------------------------ glass
 
 	/**
-	 * Tinted-glass tone: highlights roll off smoothly towards {@code cap} (linear luminance) so
-	 * white text laid on top always keeps its contrast, while hue survives and a touch of extra
-	 * saturation keeps the colours glowing through, like light through smoked glass.
+	 * Clear tinted-glass tone: no blur, every detail stays sharp, but highlights roll off
+	 * smoothly towards {@code cap} (linear luminance) so white text laid on top always keeps its
+	 * contrast, while hue survives and a touch of saturation keeps the colours glowing through.
 	 */
-	public Picture glassTone(float knee, float cap, float saturation) {
+	public Picture tint(float knee, float cap, float saturation) {
 		int[] out = new int[argb.length];
 		float span = Math.max(1.0e-4f, cap - knee);
 		for (int i = 0; i < argb.length; i++) {
@@ -334,85 +284,5 @@ public final class Picture {
 			out[i] = (c & 0xFF000000) | srgb(r * k) << 16 | srgb(g * k) << 8 | srgb(b * k);
 		}
 		return new Picture(width, height, out);
-	}
-
-	// ------------------------------------------------------------------ analysis
-
-	/**
-	 * Where the eye goes in a portrait shot against a dark backdrop: the subject's head, as
-	 * {x, y} fractions. Falls back to a pleasing upper-centre point when there is no clear
-	 * dark surround.
-	 */
-	public float[] focus() {
-		float[] span = subjectSpan();
-		if (span == null) {
-			return new float[] {0.5f, 0.4f};
-		}
-		int step = Math.max(1, Math.min(width, height) / 200);
-		int x0 = (int) (span[0] * width), x1 = Math.min(width, (int) (span[1] * width));
-		int columns = Math.max(1, (x1 - x0) / step);
-		int top = -1;
-		for (int y = 0; y < height && top < 0; y += step) {
-			int bright = 0;
-			for (int x = x0; x < x1; x += step) {
-				if (bright(argb[y * width + x])) {
-					bright++;
-				}
-			}
-			if (bright > columns * 0.03f) {
-				top = y;
-			}
-		}
-		if (top < 0) {
-			return new float[] {0.5f, 0.4f};
-		}
-		// the head: centroid of the subject's topmost tenth
-		int band = Math.max(step, height / 10);
-		double sum = 0;
-		int count = 0;
-		for (int y = top; y < Math.min(height, top + band); y += step) {
-			for (int x = x0; x < x1; x += step) {
-				if (bright(argb[y * width + x])) {
-					sum += x;
-					count++;
-				}
-			}
-		}
-		float fx = count > 0 ? (float) (sum / count) / width : (span[0] + span[1]) / 2f;
-		float fy = Math.min(0.9f, top / (float) height + 0.07f);
-		return new float[] {fx, fy};
-	}
-
-	private static boolean bright(int c) {
-		int lum = (((c >> 16) & 255) * 54 + ((c >> 8) & 255) * 183 + (c & 255) * 19) >> 8;
-		return lum > 60 && (c >>> 24) > 128;
-	}
-
-	/**
-	 * Horizontal extent of the subject of a photo shot against a dark backdrop, as fractions of
-	 * the width, or {@code null} when there is no clear dark surround to find it by.
-	 */
-	public float[] subjectSpan() {
-		int step = Math.max(1, Math.min(width, height) / 200);
-		int samples = (height + step - 1) / step;
-		int left = -1, right = -1;
-		for (int x = 0; x < width; x += step) {
-			int bright = 0;
-			for (int y = 0; y < height; y += step) {
-				if (bright(argb[y * width + x])) {
-					bright++;
-				}
-			}
-			if (bright > samples * 0.03f) {
-				if (left < 0) {
-					left = x;
-				}
-				right = x;
-			}
-		}
-		if (left < 0 || right - left > width * 0.88f) {
-			return null;
-		}
-		return new float[] {left / (float) width, Math.min(1f, (right + step) / (float) width)};
 	}
 }
