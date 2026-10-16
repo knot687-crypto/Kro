@@ -19,8 +19,14 @@ public class KroScreenshotTest implements FabricClientGameTest {
 		context.getInput().resizeWindow(1920, 1080);
 		context.waitTicks(5);
 		context.takeScreenshot("00-title");
+		// CI renders in software: generate the world in a small window so rendering does not
+		// starve the integrated server, then go back to 1080p for the screenshots
+		context.getInput().resizeWindow(854, 480);
 
 		try (TestSingleplayerContext world = context.worldBuilder().create()) {
+			world.getClientWorld().waitForChunksRender();
+			context.getInput().resizeWindow(1920, 1080);
+			context.waitTicks(10);
 			world.getClientWorld().waitForChunksRender();
 			world.getServer().runCommand("time set 6000");
 			world.getServer().runCommand("weather clear");
