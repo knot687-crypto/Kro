@@ -3,22 +3,22 @@ package dev.kro.ui.menu;
 import dev.kro.ui.render.ImageRef;
 
 /**
- * A picture shown behind the menu. A portrait picture stands beside the window with its
- * edges melting into a black stage; a landscape one covers the screen.
+ * The picture that fills the menu window, behind the interface.
  *
- * @param pixelWidth   texture width in texels
- * @param pixelHeight  texture height in texels; when it matches the screen's pixel height the
- *                     picture is drawn one texel per pixel
- * @param subjectLeft  left edge of the subject, as a fraction of the picture's width
- * @param subjectRight right edge of the subject, as a fraction of the picture's width
+ * @param image       the picture itself, ideally resampled to the window's exact pixel width
+ * @param glass       a blurred, highlight-tamed copy that glass surfaces show through
+ * @param pixelWidth  texel width of {@code image}; drawn one texel per pixel when it matches
+ * @param pixelHeight texel height of {@code image}
+ * @param focusX      where the eye goes (the subject's head), as a fraction of the width
+ * @param focusY      where the eye goes, as a fraction of the height
  */
-public record Wallpaper(ImageRef image, int pixelWidth, int pixelHeight, float subjectLeft, float subjectRight) {
+public record Wallpaper(ImageRef image, ImageRef glass, int pixelWidth, int pixelHeight, float focusX, float focusY) {
 	/** Width over height. */
 	public float aspect() {
 		return pixelWidth / (float) pixelHeight;
 	}
 
-	public boolean portrait() {
-		return aspect() < 1.15f;
+	public boolean ready() {
+		return image != null && glass != null;
 	}
 }

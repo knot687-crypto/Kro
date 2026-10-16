@@ -10,6 +10,7 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.phys.EntityHitResult;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -48,8 +49,8 @@ public final class TargetTracker {
 		if (lastAttacked != null && lastAttacked.isAlive() && !lastAttacked.isRemoved()
 				&& System.currentTimeMillis() - lastAttackAt < MEMORY_MS && lastAttacked.distanceTo(player) < 14f) {
 			pick = lastAttacked;
-		} else if (mc.crosshairPickEntity instanceof LivingEntity living && living != player && living.isAlive()
-				&& living.distanceTo(player) < 7f) {
+		} else if (mc.hitResult instanceof EntityHitResult hit && hit.getEntity() instanceof LivingEntity living
+				&& living != player && living.isAlive() && living.distanceTo(player) < 7f) {
 			pick = living;
 		}
 		current = pick;

@@ -15,12 +15,23 @@ import net.minecraft.client.gui.GuiGraphics;
 public final class HudLayer {
 	private final Kro kro;
 	private final TargetHudView target = new TargetHudView();
+	private long fpsWindow = System.nanoTime();
+	private int frames;
+	private int fps;
 
 	public HudLayer(Kro kro) {
 		this.kro = kro;
 	}
 
 	public void render(GuiGraphics graphics, DeltaTracker tickCounter) {
+		// frames per second, counted over whole one-second windows
+		frames++;
+		long now = System.nanoTime();
+		if (now - fpsWindow >= 1_000_000_000L) {
+			fps = Math.round(frames * 1.0e9f / (now - fpsWindow));
+			frames = 0;
+			fpsWindow = now;
+		}
 		Minecraft mc = Minecraft.getInstance();
 		if (mc.options.hideGui || mc.player == null) {
 			return;
@@ -40,7 +51,7 @@ public final class HudLayer {
 		}
 		boolean sprintChip = kro.modules.sprint.enabled() && kro.modules.sprint.indicator.on() && mc.player.isSprinting();
 		if (kro.modules.ui.watermark.on() || sprintChip) {
-			Watermark.render(c, mc.getFps(), kro.modules.ui.watermark.on(), sprintChip);
+			Watermark.render(c, fps, kro.modules.ui.watermark.on(), sprintChip);
 		}
 	}
 }

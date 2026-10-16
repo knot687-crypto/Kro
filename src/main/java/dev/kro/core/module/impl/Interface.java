@@ -12,11 +12,9 @@ import dev.kro.ui.render.Icons;
 /** Client-wide preferences. Always enabled; opened from the centre of the hub. */
 public final class Interface extends Module {
 	public final ModeSetting accent = mode("Accent", "Signature colour of the whole client.", "Iris", "Iris", "Rose", "Mint", "Ember", "Frost", "Mono");
-	public final ModeSetting background = mode("Background", "Your picture on a black stage, or the blurred world. Swap the picture: config/kro/wallpaper.png", "Picture", "Picture", "Blur");
-	public final NumberSetting blur = number("Background blur", "Blur behind the menu.", 6, 0, 10, 1, "")
-			.visibleWhen(() -> background.is("Blur"));
-	public final NumberSetting dim = number("Background dim", "Darkening behind the menu.", 30, 0, 80, 1, "%")
-			.visibleWhen(() -> background.is("Blur"));
+	public final ModeSetting window = mode("Window", "Fill the menu with your picture under frosted glass, or keep it plain black. Swap the picture: config/kro/wallpaper.png", "Picture", "Picture", "Black");
+	public final NumberSetting blur = number("Game blur", "How much the game behind the menu is blurred.", 5, 0, 10, 1, "");
+	public final NumberSetting dim = number("Game dim", "How much the game behind the menu is darkened.", 25, 0, 80, 1, "%");
 	public final NumberSetting animationSpeed = number("Animation speed", "Speed of every transition.", 1.0, 0.5, 2.0, 0.1, "×");
 	public final BoolSetting notifications = bool("Notifications", "Show a toast when a module is toggled by key.", true);
 	public final BoolSetting watermark = bool("Watermark", "A small Kro mark in the corner of your HUD.", false);

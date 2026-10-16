@@ -4,7 +4,12 @@ import dev.kro.Kro;
 import dev.kro.core.module.impl.WorldTheme;
 import dev.kro.core.util.Colors;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.core.Registry;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.attribute.EnvironmentAttribute;
 import net.minecraft.core.particles.DustParticleOptions;
 import net.minecraft.core.particles.ParticleOptions;
 import net.minecraft.core.particles.ParticleTypes;
@@ -17,9 +22,13 @@ import java.util.concurrent.ThreadLocalRandom;
  * drifting ambient particles. Purely cosmetic and never sent to the server.
  */
 public final class WorldThemeController {
+	private static final Object MISSING = new Object();
+
 	private final Kro kro;
 	private Vector4f lastFog;
 	private float particleDebt;
+	private Object skyAttribute;
+	private Object cloudAttribute;
 
 	public WorldThemeController(Kro kro) {
 		this.kro = kro;
@@ -63,6 +72,48 @@ public final class WorldThemeController {
 	public int cloud(int original) {
 		WorldTheme m = kro.modules.worldTheme;
 		return tint(original, Colors.lerp(m.currentLook().fog(), 0xFFFFFFFF, 0.55f), m.skyTint.floatValue() / 160f);
+	}
+
+	/**
+	 * Tints a colour environment attribute as the camera reads it. The sky and cloud attributes
+	 * are found once by their registry names, which stay stable across versions.
+	 */
+	public int attribute(EnvironmentAttribute<?> attribute, int colour) {
+		if (skyAttribute == null && !resolve()) {
+			return colour;
+		}
+		if (attribute == skyAttribute) {
+			return sky(colour);
+		}
+		if (attribute == cloudAttribute) {
+			return cloud(colour);
+		}
+		return colour;
+	}
+
+	private boolean resolve() {
+		ClientLevel level = Minecraft.getInstance().level;
+		if (level == null) {
+			return false;
+		}
+		Registry<EnvironmentAttribute<?>> registry = level.registryAccess().lookupOrThrow(Registries.ENVIRONMENT_ATTRIBUTE);
+		for (EnvironmentAttribute<?> a : registry) {
+			Identifier id = registry.getKey(a);
+			if (id == null) {
+				continue;
+			}
+			switch (id.getPath()) {
+				case "visual/sky_color" -> skyAttribute = a;
+				case "visual/cloud_color" -> cloudAttribute = a;
+				default -> {
+				}
+			}
+		}
+		if (skyAttribute == null) {
+			// unknown layout: never look again, leave colours untouched
+			skyAttribute = MISSING;
+		}
+		return true;
 	}
 
 	public void fog(Vector4f fog) {

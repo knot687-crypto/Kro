@@ -5,7 +5,7 @@
 	"compatibilityLevel": "JAVA_21",
 	"client": [
 		"ClientLevelDataMixin",
-		"ClientLevelMixin",
+		"EnvironmentAttributeProbeMixin",
 		"FogRendererMixin",
 		"KeyboardHandlerMixin",
 		"KeyMappingMixin",

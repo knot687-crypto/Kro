@@ -89,13 +89,16 @@ public final class Toasts {
 
 	private void draw(Canvas c, Toast t, float x, float y, float age) {
 		Draw.panel(c, x, y, W, H, 10f, 5f, 14f, 0x73000000);
-		float tile = 22f, tx = x + 7f, ty = y + (H - tile) / 2f;
-		c.rect(tx, ty, tile, tile, 7f, t.enabled ? Theme.accent() : 0x17FFFFFF);
-		c.icon(t.module.icon(), tx + tile / 2f, ty + tile / 2f, 11f, t.enabled ? Theme.onAccent() : Theme.TEXT_DIM);
-		c.text(Fonts.semibold(), 8.5f, t.module.name(), tx + tile + 9f, y + 13f, Theme.TEXT);
-		int stateCol = t.enabled ? Theme.GOOD : Theme.TEXT_FAINT;
-		c.circle(tx + tile + 11f, y + 25f, 2f, stateCol);
-		c.text(Fonts.medium(), 7f, t.enabled ? "Enabled" : "Disabled", tx + tile + 16f, y + 25f, Theme.TEXT_DIM);
+		// a lit (or unlit) indicator instead of an icon
+		float dx = x + 15f, dy = y + H / 2f - 1f;
+		if (t.enabled) {
+			c.glow(dx, dy, 3.5f, 6f, Theme.accent(0.55f));
+			c.circle(dx, dy, 3.5f, Theme.accentLight(), Theme.accentLight(), Theme.accent(), Theme.accent());
+		} else {
+			c.ring(dx, dy, 3.5f, 1.2f, 0x6BFFFFFF);
+		}
+		c.text(Fonts.semibold(), 8.5f, t.module.name(), x + 28f, y + 13f, Theme.TEXT);
+		c.text(Fonts.medium(), 7f, t.enabled ? "Enabled" : "Disabled", x + 28f, y + 24.5f, t.enabled ? Colors.lerp(Theme.accentLight(), 0xFFFFFFFF, 0.35f) : Theme.TEXT_DIM);
 		float life = Math.max(0f, 1f - age / LIFE);
 		c.rect(x + 10f, y + H - 3f, (W - 20f) * life, 1.5f, 0.75f, Colors.withAlpha(t.enabled ? Theme.accent() : 0xFFFFFFFF, 0.55f));
 	}

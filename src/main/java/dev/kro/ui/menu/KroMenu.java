@@ -34,18 +34,14 @@ public final class KroMenu {
 	static final float FOOTER = 36f;
 	static final float SIDE = 20f;
 	static final float GAP = 12f;
-	static final float CARD_H = 146f;
+	static final float CARD_H = 112f;
 	static final float GRID_TOP = 18f;
 	static final float GRID_BOTTOM = 20f;
 	private static final float RADIUS = 16f;
 	private static final float MAX_W = 744f;
 	private static final float MAX_H = 460f;
-	/** Narrowest the window gets to make room for a picture beside it. */
-	private static final float MIN_W = 660f;
-	/** Margins of the row "window, gap, picture subject" when they share the screen. */
-	private static final float EDGE_LEFT = 28f;
-	private static final float EDGE_GAP = 26f;
-	private static final float EDGE_RIGHT = 22f;
+	/** Where the picture's focus (the subject's face) sits, as a fraction of the window height. */
+	private static final float FOCUS_AT = 0.40f;
 	private static final String[] TABS = {"All", "Combat", "Movement", "Visual", "Client"};
 
 	private final ModuleRegistry modules;
@@ -64,8 +60,9 @@ public final class KroMenu {
 	private final Anim searchHover = new Anim(0f, 16f);
 	private final Anim emptyAnim = new Anim(0f, 12f);
 	private final Anim statusSwap = new Anim(1f, 16f);
-	private final Spring pictureIn = new Spring(0f, Spring.GENTLE);
+	private final Spring reveal = new Spring(0f, Spring.GENTLE);
 	private final Anim drift = new Anim(0f, 2.5f);
+	private final Glass glass = new Glass();
 	private final long openedAt = Clock.nanos();
 
 	private SettingsPage page;
@@ -90,10 +87,6 @@ public final class KroMenu {
 	private float hudCenter;
 	private float dim = 0.3f;
 	private Wallpaper wallpaper;
-	private float picX;
-	private float picY;
-	private float picW;
-	private float picH;
 	private ModuleCard pressed;
 	private Runnable hudEditor;
 	private String status;
@@ -124,9 +117,24 @@ public final class KroMenu {
 		this.dim = dim;
 	}
 
-	/** The picture behind the menu, or {@code null} to show the world (blurred and dimmed). */
+	/** The picture that fills the window behind the interface, or {@code null} for plain black. */
 	public void setWallpaper(Wallpaper wallpaper) {
 		this.wallpaper = wallpaper;
+	}
+
+	/** Design units to GUI units for a GUI of this size. */
+	private static float designScale(float guiW, float guiH, float uiScale) {
+		return Math.max(0.45f, Math.min(guiW / DESIGN_W, guiH / DESIGN_H) * uiScale);
+	}
+
+	/** The window's width in physical pixels: the width to resample the window picture to. */
+	public static int windowPixelWidth(float guiW, float guiH, float guiScale) {
+		float u = designScale(guiW, guiH, 1f);
+		return Math.max(1, Math.round(Math.min(MAX_W, guiW / u - 48f) * u * guiScale));
+	}
+
+	private static float snap(float v, float px) {
+		return Math.round(v * px) / px;
 	}
 
 	public boolean finished() {
@@ -151,7 +159,7 @@ public final class KroMenu {
 	// ------------------------------------------------------------------ render
 
 	public void render(Canvas c, float guiW, float guiH, float gmx, float gmy, float uiScale) {
-		u = Math.max(0.45f, Math.min(guiW / DESIGN_W, guiH / DESIGN_H) * uiScale);
+		u = designScale(guiW, guiH, uiScale);
 		dw = guiW / u;
 		dh = guiH / u;
 		mouse.x = gmx / u;
@@ -166,16 +174,10 @@ public final class KroMenu {
 
 		c.push();
 		c.scale(u);
-		ww = Math.min(MAX_W, dw - 48f);
-		wx = (dw - ww) / 2f;
-		if (wallpaper != null) {
-			layoutPicture(c);
-			renderPicture(c, o);
-		} else {
-			pictureIn.snap(0f);
-			c.rect(0f, 0f, dw, dh, 0f, Colors.withAlpha(0x000000, dim * o));
-		}
+		// the game stays visible around the window, dimmed (the host blurs it)
+		c.rect(0f, 0f, dw, dh, 0f, Colors.withAlpha(0x000000, dim * o));
 
+		float px = u * c.guiScale();
 		List<ModuleCard> visibleCards = filtered();
 		float maxH = Math.min(MAX_H, dh - 48f);
 		float target = HEADER + 1f + FOOTER + (page != null ? page.contentHeight() : gridHeight(visibleCards.size()));
@@ -184,95 +186,85 @@ public final class KroMenu {
 			height.snap(target);
 			heightPlaced = true;
 		}
+		ww = Math.min(MAX_W, dw - 48f);
 		wh = height.to(target).get();
-		wy = (dh - maxH) / 2f;
+		wx = snap((dw - ww) / 2f, px);
+		wy = snap((dh - maxH) / 2f, px);
 
 		c.push();
 		c.alpha(o);
 		float e = Ease.outCubic(o);
 		c.translate(0f, (1f - e) * 12f);
 		c.scale(0.965f + 0.035f * e, wx + ww / 2f, wy + wh / 2f);
-		Draw.window(c, wx, wy, ww, wh, RADIUS);
-		c.rect(wx + 1f, wy + 1f, ww - 2f, HEADER, RADIUS - 1f, 0x08FFFFFF, 0x08FFFFFF, 0x00FFFFFF, 0x00FFFFFF);
+		boolean picture = wallpaper != null && wallpaper.ready();
+		if (picture) {
+			drawPictureWindow(c, px, maxH);
+		} else {
+			glass.clear();
+			reveal.snap(0f);
+			Draw.window(c, wx, wy, ww, wh, RADIUS);
+			c.rect(wx + 1f, wy + 1f, ww - 2f, HEADER, RADIUS - 1f, 0x08FFFFFF, 0x08FFFFFF, 0x00FFFFFF, 0x00FFFFFF);
+		}
 		renderHeader(c);
-		c.rect(wx, wy + HEADER, ww, 1f, 0f, Theme.DIVIDER);
+		c.rect(wx, wy + HEADER, ww, 1f, 0f, picture ? 0x14FFFFFF : Theme.DIVIDER);
 		renderContent(c, visibleCards);
 		renderFooter(c);
+		if (picture) {
+			drawRim(c);
+		}
 		c.pop();
 		c.pop();
 	}
 
 	/**
-	 * Sizes the picture, one texel per screen pixel when its texture was made for this screen,
-	 * and moves the window aside so a portrait subject stands next to it instead of behind it.
-	 * Spare width on wide screens is shared evenly between the margins and the gap.
+	 * The window filled with the picture: covered at the window's tallest so it holds still while
+	 * the window resizes, placed so the subject's face sits in view, drawn one texel per pixel
+	 * once settled. It eases in with a slow settle; a settings page frosts it for focus.
 	 */
-	private void layoutPicture(Canvas c) {
+	private void drawPictureWindow(Canvas c, float px, float maxH) {
 		Wallpaper wp = wallpaper;
-		float px = u * c.guiScale();
-		if (Math.abs(wp.pixelHeight() - dh * px) <= 1.5f) {
-			picH = wp.pixelHeight() / px;
-			picW = wp.pixelWidth() / px;
-		} else {
-			picH = dh;
-			picW = dh * wp.aspect();
+		float settle = Ease.outCubic(Math.max(0f, Math.min(1f, reveal.to(1f).get())));
+		float pw = Math.max(ww, maxH * wp.aspect());
+		float ph = pw / wp.aspect();
+		if (Math.abs(wp.pixelWidth() - pw * px) <= 1.5f) {
+			pw = wp.pixelWidth() / px;
+			ph = wp.pixelHeight() / px;
 		}
-		if (!wp.portrait()) {
-			float cover = Math.max(dw / picW, dh / picH);
-			picW *= cover;
-			picH *= cover;
-			picX = (dw - picW) / 2f;
-			picY = (dh - picH) / 2f;
-			return;
+		float zoom = 1f + 0.06f * (1f - settle);
+		pw *= zoom;
+		ph *= zoom;
+		float shift = drift.to(interactive() ? (0.5f - mouse.x / Math.max(1f, dw)) * 6f : 0f).get();
+		float ox = wx + ww * 0.5f - wp.focusX() * pw;
+		float oy = wy + maxH * FOCUS_AT - wp.focusY() * ph;
+		ox = Math.max(wx + ww - pw, Math.min(wx, ox)) + shift;
+		oy = Math.max(wy + maxH - ph, Math.min(wy, oy));
+		if (settle > 0.999f) {
+			ox = snap(ox, px);
+			oy = snap(oy, px);
 		}
-		picY = 0f;
-		float subject = (wp.subjectRight() - wp.subjectLeft()) * picW;
-		float room = dw - EDGE_LEFT - EDGE_GAP - subject - EDGE_RIGHT;
-		float spare = 0f;
-		if (room >= MAX_W) {
-			ww = MAX_W;
-			spare = (room - MAX_W) / 3f;
-		} else {
-			ww = Math.min(Math.max(MIN_W, room), dw - 48f);
+		glass.set(wp.glass(), ox, oy, pw, ph);
+
+		// lift off the game
+		c.shadow(wx, wy + 20f, ww, wh, RADIUS, 48f, 0xA6000000);
+		c.shadow(wx, wy + 3f, ww, wh, RADIUS, 8f, 0x59000000);
+		c.image(wp.image(), wx, wy, ww, wh, RADIUS, 0xFFFFFFFF, (wx - ox) / pw, (wy - oy) / ph, (wx + ww - ox) / pw, (wy + wh - oy) / ph);
+
+		// a settings page frosts the whole picture so its rows read cleanly
+		float focus = Math.max(0f, Math.min(1f, pageAnim.get()));
+		if (focus > 0.005f) {
+			glass.fill(c, wx, wy, ww, wh, RADIUS, Colors.withAlpha(0xFFFFFF, 0.94f * focus));
 		}
-		wx = Math.min(EDGE_LEFT + spare, (dw - ww) / 2f);
-		picX = dw - EDGE_RIGHT - spare - wp.subjectRight() * picW;
+		// shading: deep at the bars, a breath of darkness overall, light falling from the top
+		c.rect(wx, wy, ww, wh, RADIUS, Colors.withAlpha(0x000000, 0.10f + 0.16f * focus));
+		c.rectV(wx, wy, ww, HEADER + 40f, RADIUS, 0x99000000, 0x00000000);
+		c.rectV(wx, wy + wh - FOOTER - 44f, ww, FOOTER + 44f, RADIUS, 0x00000000, 0xA6000000);
+		c.rectV(wx, wy, ww, wh * 0.5f, RADIUS, 0x0AFFFFFF, 0x00FFFFFF);
 	}
 
-	/** Black stage, then the picture gliding in from the right with its edges melted into black. */
-	private void renderPicture(Canvas c, float o) {
-		c.rect(0f, 0f, dw, dh, 0f, Colors.withAlpha(0x000000, o));
-		if (wallpaper.image() == null) {
-			// still being prepared: hold the reveal until it arrives
-			pictureIn.snap(0f);
-			return;
-		}
-		float p = Math.max(0f, Math.min(1f, pictureIn.to(1f).get()));
-		float a = o * p;
-		if (a < 0.004f) {
-			return;
-		}
-		float e = Ease.outCubic(p);
-		float px = u * c.guiScale();
-		float shift = drift.to(interactive() ? (0.5f - mouse.x / Math.max(1f, dw)) * 8f : 0f).get();
-		float x = Math.round((picX + (1f - e) * 30f + shift) * px) / px;
-		float y = Math.round(picY * px) / px;
-		c.push();
-		c.alpha(a);
-		c.image(wallpaper.image(), x, y, picW, picH, 0f, 0xFFFFFFFF, 0f, 0f, 1f, 1f);
-		if (wallpaper.portrait()) {
-			float left = wallpaper.subjectLeft() * picW * 0.9f;
-			c.rectH(x - 1f, y, left + 1f, picH, 0f, 0xFF000000, 0x00000000);
-			float right = (1f - Math.min(1f, wallpaper.subjectRight() + 0.02f)) * picW;
-			if (right > 0.5f) {
-				c.rectH(x + picW - right, y, right + 1f, picH, 0f, 0x00000000, 0xFF000000);
-			}
-			c.rectV(x - 1f, y + picH * 0.82f, picW + 2f, picH * 0.18f + 1f, 0f, 0x00000000, 0x8C000000);
-		} else {
-			// keep the window legible over a full-screen picture
-			c.rect(0f, 0f, dw, dh, 0f, 0x80000000);
-		}
-		c.pop();
+	/** Two hairlines: a bright outer rim catching light from above and a faint inner one. */
+	private void drawRim(Canvas c) {
+		c.outline(wx, wy, ww, wh, RADIUS, 1f, 0x38FFFFFF, 0x38FFFFFF, 0x14FFFFFF, 0x14FFFFFF);
+		c.outline(wx + 1f, wy + 1f, ww - 2f, wh - 2f, RADIUS - 1f, 1f, 0x0FFFFFFF, 0x0FFFFFFF, 0x05FFFFFF, 0x05FFFFFF);
 	}
 
 	private static int rowsFor(int count) {
@@ -290,15 +282,7 @@ public final class KroMenu {
 
 	private void renderHeader(Canvas c) {
 		float cy = wy + HEADER / 2f;
-		float lx = wx + SIDE;
-		c.rect(lx, cy - 11f, 22f, 22f, 7f, Theme.accentLight(), Theme.accent(), Theme.accent(), Theme.accentLight());
-		c.outline(lx, cy - 11f, 22f, 22f, 7f, 1f, 0x47FFFFFF, 0x1FFFFFFF, 0x00FFFFFF, 0x1FFFFFFF);
-		c.text(Fonts.display(), 13f, "K", lx + 11f, cy, Theme.onAccent(), Canvas.CENTER);
-		c.text(Fonts.semibold(), 11.5f, "Kro", lx + 30f, cy, Theme.TEXT);
-		float divX = lx + 30f + c.textWidth(Fonts.semibold(), 11.5f, "Kro") + 16f;
-		c.rect(divX, cy - 9f, 1f, 18f, 0f, Theme.DIVIDER);
-
-		float tx = divX + 14f;
+		float tx = wx + SIDE - 4f;
 		for (int i = 0; i < TABS.length; i++) {
 			float tw = c.textWidth(Fonts.medium(), 8.5f, TABS[i]) + 24f;
 			tabRects[i] = new float[] {tx, cy - 13f, tw, 26f};
@@ -311,6 +295,10 @@ public final class KroMenu {
 			tabPlaced = true;
 		}
 		float ix = tabX.to(sel[0]).get(), iw = tabW.to(sel[2]).get();
+		if (glass.active()) {
+			glass.fill(c, ix, cy - 13f, iw, 26f, 8f, 0xFFFFFFFF);
+			c.rect(ix, cy - 13f, iw, 26f, 8f, 0x47000000);
+		}
 		c.rect(ix, cy - 13f, iw, 26f, 8f, 0x17FFFFFF, 0x17FFFFFF, 0x11FFFFFF, 0x11FFFFFF);
 		c.outline(ix, cy - 13f, iw, 26f, 8f, 1f, 0x14FFFFFF, 0x14FFFFFF, 0x05FFFFFF, 0x05FFFFFF);
 		for (int i = 0; i < TABS.length; i++) {
@@ -339,6 +327,10 @@ public final class KroMenu {
 		float sx = hudX - 18f - sw, sy = cy - sh / 2f;
 		float sf = searchFocus.to(searchFocused || !search.isEmpty()).get();
 		float shv = searchHover.to(interactive() && mouse.in(sx, sy, sw, sh)).get();
+		if (glass.active()) {
+			glass.fill(c, sx, sy, sw, sh, 8f, 0xFFFFFFFF);
+			c.rect(sx, sy, sw, sh, 8f, 0x52000000);
+		}
 		c.rect(sx, sy, sw, sh, 8f, Colors.lerp(Theme.FIELD, Theme.SURFACE_HOVER, Math.max(shv * 0.6f, sf * 0.5f)));
 		c.outline(sx, sy, sw, sh, 8f, 1f, Colors.lerp(Colors.lerp(Theme.BORDER, Theme.BORDER_STRONG, shv), Theme.accent(0.55f), sf));
 		c.icon(Icons.SEARCH, sx + 14f, cy, 10f, Colors.lerp(Theme.TEXT_FAINT, Theme.TEXT_DIM, Math.max(shv, sf)));
@@ -442,7 +434,7 @@ public final class KroMenu {
 			boolean ready = elapsed >= card.delay;
 			card.visible.to(card.shown && ready ? 1f : 0f);
 			card.press.to(pressed == card ? 1f : 0f);
-			card.render(c, mouse, interactive && interactive());
+			card.render(c, mouse, interactive && interactive(), glass);
 			if (interactive && card.contains(mouse)) {
 				hoveredCard = card;
 			}
@@ -511,6 +503,11 @@ public final class KroMenu {
 						active++;
 					}
 				}
+			}
+			if (active > 0) {
+				// a slow breath of light: something is running
+				float breath = 0.5f + 0.5f * (float) Math.sin(Clock.seconds() * 2.2);
+				c.glow(x + 3f, cy, 3f, 4f + 2.5f * breath, Colors.withAlpha(Theme.GOOD, 0.22f + 0.26f * breath));
 			}
 			c.circle(x + 3f, cy, 3f, active > 0 ? Theme.GOOD : Theme.TEXT_FAINT);
 			c.text(Fonts.medium(), 7.5f, active + " of " + total + " modules active", x + 11f, cy, Theme.TEXT_DIM);

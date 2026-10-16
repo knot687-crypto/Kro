@@ -1,16 +1,19 @@
 #version 330
 
-#moj_import <minecraft:fog.glsl>
-#moj_import <minecraft:dynamictransforms.glsl>
+layout(std140) uniform DynamicTransforms {
+    mat4 ModelViewMat;
+    vec4 ColorModulator;
+    vec3 ModelOffset;
+    mat4 TextureMat;
+};
 
 in vec2 vUv;
 in vec4 vColor;
-in float sphericalVertexDistance;
-in float cylindricalVertexDistance;
 
 out vec4 fragColor;
 
-// Procedural light, no textures. UV spans -1..1 across the quad.
+// Procedural light, no textures. UV spans -1..1 across the quad. Sparks only ever appear within
+// arm's reach, so they skip fog and stay bright and clean.
 //   SPARK: x across the streak, y along it (+1 is the hot head).
 //   RING:  a soft expanding halo for the impact flash.
 void main() {
@@ -28,10 +31,10 @@ void main() {
     float hot = exp(-vUv.x * vUv.x * 30.0) * along;
     vec3 rgb = mix(vColor.rgb, vec3(1.0), clamp(hot, 0.0, 1.0) * 0.85);
 #endif
-    float fog = 1.0 - total_fog_value(sphericalVertexDistance, cylindricalVertexDistance, FogEnvironmentalStart, FogEnvironmentalEnd, FogRenderDistanceStart, FogRenderDistanceEnd);
-    float a = clamp(intensity * vColor.a * fog, 0.0, 1.0);
+    float a = clamp(intensity * vColor.a, 0.0, 1.0);
     if (a <= 0.002) {
         discard;
     }
+    // additive: premultiplied light
     fragColor = vec4(rgb * a, a) * ColorModulator;
 }

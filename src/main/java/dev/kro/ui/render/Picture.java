@@ -223,7 +223,170 @@ public final class Picture {
 		}
 	}
 
+	// ------------------------------------------------------------------ glass
+
+	/**
+	 * Gaussian blur (three box passes) in linear light on premultiplied colour, so bright detail
+	 * spreads the way light does instead of turning muddy.
+	 */
+	public Picture blur(float sigma) {
+		int n = width * height;
+		float[][] ch = new float[4][n];
+		for (int i = 0; i < n; i++) {
+			int c = argb[i];
+			float a = (c >>> 24) / 255f;
+			ch[0][i] = TO_LINEAR[(c >> 16) & 255] * a;
+			ch[1][i] = TO_LINEAR[(c >> 8) & 255] * a;
+			ch[2][i] = TO_LINEAR[c & 255] * a;
+			ch[3][i] = a;
+		}
+		if (sigma > 0.25f) {
+			float[] tmp = new float[n];
+			for (int size : boxSizes(sigma)) {
+				int r = (size - 1) / 2;
+				for (float[] plane : ch) {
+					boxRows(plane, tmp, width, height, r);
+					boxColumns(tmp, plane, width, height, r);
+				}
+			}
+		}
+		int[] out = new int[n];
+		for (int i = 0; i < n; i++) {
+			float a = ch[3][i];
+			int alpha = Math.round(Math.min(1f, a) * 255f);
+			if (alpha <= 0) {
+				continue;
+			}
+			float inv = 1f / a;
+			out[i] = alpha << 24 | srgb(ch[0][i] * inv) << 16 | srgb(ch[1][i] * inv) << 8 | srgb(ch[2][i] * inv);
+		}
+		return new Picture(width, height, out);
+	}
+
+	/** Box widths whose three passes approximate a Gaussian of {@code sigma} (Kutskir). */
+	private static int[] boxSizes(float sigma) {
+		int n = 3;
+		double ideal = Math.sqrt(12.0 * sigma * sigma / n + 1.0);
+		int lower = (int) Math.floor(ideal);
+		if (lower % 2 == 0) {
+			lower--;
+		}
+		int upper = lower + 2;
+		double m = (12.0 * sigma * sigma - n * lower * lower - 4.0 * n * lower - 3.0 * n) / (-4.0 * lower - 4.0);
+		long small = Math.round(m);
+		int[] sizes = new int[n];
+		for (int i = 0; i < n; i++) {
+			sizes[i] = i < small ? lower : upper;
+		}
+		return sizes;
+	}
+
+	private static void boxRows(float[] src, float[] dst, int w, int h, int r) {
+		float inv = 1f / (2 * r + 1);
+		for (int y = 0; y < h; y++) {
+			int row = y * w;
+			float first = src[row];
+			float acc = (r + 1) * first;
+			for (int j = 0; j < r; j++) {
+				acc += src[row + Math.min(j, w - 1)];
+			}
+			for (int x = 0; x < w; x++) {
+				acc += src[row + Math.min(x + r, w - 1)] - src[row + Math.max(x - r - 1, 0)];
+				dst[row + x] = acc * inv;
+			}
+		}
+	}
+
+	private static void boxColumns(float[] src, float[] dst, int w, int h, int r) {
+		float inv = 1f / (2 * r + 1);
+		for (int x = 0; x < w; x++) {
+			float first = src[x];
+			float acc = (r + 1) * first;
+			for (int j = 0; j < r; j++) {
+				acc += src[Math.min(j, h - 1) * w + x];
+			}
+			for (int y = 0; y < h; y++) {
+				acc += src[Math.min(y + r, h - 1) * w + x] - src[Math.max(y - r - 1, 0) * w + x];
+				dst[y * w + x] = acc * inv;
+			}
+		}
+	}
+
+	/**
+	 * Tinted-glass tone: highlights roll off smoothly towards {@code cap} (linear luminance) so
+	 * white text laid on top always keeps its contrast, while hue survives and a touch of extra
+	 * saturation keeps the colours glowing through, like light through smoked glass.
+	 */
+	public Picture glassTone(float knee, float cap, float saturation) {
+		int[] out = new int[argb.length];
+		float span = Math.max(1.0e-4f, cap - knee);
+		for (int i = 0; i < argb.length; i++) {
+			int c = argb[i];
+			float r = TO_LINEAR[(c >> 16) & 255];
+			float g = TO_LINEAR[(c >> 8) & 255];
+			float b = TO_LINEAR[c & 255];
+			float l = 0.2126f * r + 0.7152f * g + 0.0722f * b;
+			r = l + (r - l) * saturation;
+			g = l + (g - l) * saturation;
+			b = l + (b - l) * saturation;
+			float target = l <= knee ? l : knee + span * (1f - (float) Math.exp(-(l - knee) / span));
+			float k = l > 1.0e-6f ? target / l : 1f;
+			out[i] = (c & 0xFF000000) | srgb(r * k) << 16 | srgb(g * k) << 8 | srgb(b * k);
+		}
+		return new Picture(width, height, out);
+	}
+
 	// ------------------------------------------------------------------ analysis
+
+	/**
+	 * Where the eye goes in a portrait shot against a dark backdrop: the subject's head, as
+	 * {x, y} fractions. Falls back to a pleasing upper-centre point when there is no clear
+	 * dark surround.
+	 */
+	public float[] focus() {
+		float[] span = subjectSpan();
+		if (span == null) {
+			return new float[] {0.5f, 0.4f};
+		}
+		int step = Math.max(1, Math.min(width, height) / 200);
+		int x0 = (int) (span[0] * width), x1 = Math.min(width, (int) (span[1] * width));
+		int columns = Math.max(1, (x1 - x0) / step);
+		int top = -1;
+		for (int y = 0; y < height && top < 0; y += step) {
+			int bright = 0;
+			for (int x = x0; x < x1; x += step) {
+				if (bright(argb[y * width + x])) {
+					bright++;
+				}
+			}
+			if (bright > columns * 0.03f) {
+				top = y;
+			}
+		}
+		if (top < 0) {
+			return new float[] {0.5f, 0.4f};
+		}
+		// the head: centroid of the subject's topmost tenth
+		int band = Math.max(step, height / 10);
+		double sum = 0;
+		int count = 0;
+		for (int y = top; y < Math.min(height, top + band); y += step) {
+			for (int x = x0; x < x1; x += step) {
+				if (bright(argb[y * width + x])) {
+					sum += x;
+					count++;
+				}
+			}
+		}
+		float fx = count > 0 ? (float) (sum / count) / width : (span[0] + span[1]) / 2f;
+		float fy = Math.min(0.9f, top / (float) height + 0.07f);
+		return new float[] {fx, fy};
+	}
+
+	private static boolean bright(int c) {
+		int lum = (((c >> 16) & 255) * 54 + ((c >> 8) & 255) * 183 + (c & 255) * 19) >> 8;
+		return lum > 60 && (c >>> 24) > 128;
+	}
 
 	/**
 	 * Horizontal extent of the subject of a photo shot against a dark backdrop, as fractions of
@@ -236,9 +399,7 @@ public final class Picture {
 		for (int x = 0; x < width; x += step) {
 			int bright = 0;
 			for (int y = 0; y < height; y += step) {
-				int c = argb[y * width + x];
-				int lum = (((c >> 16) & 255) * 54 + ((c >> 8) & 255) * 183 + (c & 255) * 19) >> 8;
-				if (lum > 60 && (c >>> 24) > 128) {
+				if (bright(argb[y * width + x])) {
 					bright++;
 				}
 			}

@@ -127,13 +127,8 @@ final class SettingsPage {
 		c.circle(bx, cy, 14f, Colors.lerp(Theme.FIELD, Theme.SURFACE_ACTIVE, bh));
 		c.icon(Icons.CHEVRON_LEFT, bx - 0.5f, cy, 11f, Colors.lerp(Theme.TEXT_DIM, Theme.TEXT, bh));
 
-		float tx = bx + 26f;
 		float on = Math.max(0f, Math.min(1f, masterOn.to(module.enabled()).get()));
-		int tile = Colors.lerp(Theme.FIELD, Theme.accent(), module.alwaysOn() ? 0f : on);
-		c.rect(tx, cy - 15f, 30f, 30f, 9f, tile);
-		c.icon(module.icon(), tx + 15f, cy, 13f, Colors.lerp(Theme.TEXT, Theme.onAccent(), module.alwaysOn() ? 0f : on));
-
-		float nx = tx + 42f;
+		float nx = bx + 28f;
 		c.text(Fonts.semibold(), 12f, module.name(), nx, cy - 6f, Theme.TEXT);
 		float maxDesc = w - (nx - x) - SIDE - 150f;
 		c.text(Fonts.medium(), 7.5f, c.ellipsize(Fonts.medium(), 7.5f, module.description(), maxDesc), nx, cy + 8f, Theme.TEXT_DIM);

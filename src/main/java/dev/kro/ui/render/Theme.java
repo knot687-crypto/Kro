@@ -24,9 +24,10 @@ public final class Theme {
 	public static final int SHADOW = 0xB3000000;
 
 	// text
-	public static final int TEXT = 0xFFF2F2F3;
-	public static final int TEXT_DIM = 0xFF9C9CA2;
-	public static final int TEXT_FAINT = 0xFF606066;
+	public static final int TEXT = 0xFFF4F4F5;
+	// translucent whites, so secondary text keeps its contrast over black and over glass alike
+	public static final int TEXT_DIM = 0xA8FFFFFF;
+	public static final int TEXT_FAINT = 0x69FFFFFF;
 
 	// signals
 	public static final int GOOD = 0xFF3DD68C;

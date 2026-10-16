@@ -36,9 +36,9 @@ public final class KroScreen extends Screen {
 		return menu.cardCentre(index);
 	}
 
-	/** Physical pixel height of the GUI, the size the wallpaper is resampled to. */
-	public static int pixelHeight(Minecraft mc) {
-		return Math.round(mc.getWindow().getGuiScaledHeight() * (float) mc.getWindow().getGuiScale());
+	/** The menu window's width in physical pixels: the width its picture is resampled to. */
+	public static int pictureWidth(Minecraft mc) {
+		return KroMenu.windowPixelWidth(mc.getWindow().getGuiScaledWidth(), mc.getWindow().getGuiScaledHeight(), (float) mc.getWindow().getGuiScale());
 	}
 
 	/** Whether the Kro menu is on screen (used to drive the background blur). */
@@ -71,8 +71,9 @@ public final class KroScreen extends Screen {
 	public void renderBackground(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
 		Kro kro = Kro.get();
 		Interface ui = kro.modules.ui;
-		wallpaper = ui.background.is("Picture") ? kro.wallpaper.get(pixelHeight(Minecraft.getInstance())) : null;
-		if (wallpaper == null && ui.blur.intValue() > 0) {
+		wallpaper = ui.window.is("Picture") ? kro.wallpaper.get(pictureWidth(Minecraft.getInstance())) : null;
+		// the game stays visible behind the menu
+		if (ui.blur.intValue() > 0) {
 			this.renderBlurredBackground(graphics);
 		}
 	}
@@ -119,7 +120,7 @@ public final class KroScreen extends Screen {
 			// ignore auto-repeat of the key that opened the menu
 			return true;
 		}
-		return menu.keyPressed(event.key(), event.modifiers(), menuKey) || menu.wantsKeyboard();
+		return menu.keyPressed(event.key(), 0, menuKey) || menu.wantsKeyboard();
 	}
 
 	@Override

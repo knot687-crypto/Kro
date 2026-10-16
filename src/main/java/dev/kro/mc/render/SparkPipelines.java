@@ -2,7 +2,6 @@ package dev.kro.mc.render;
 
 import com.mojang.blaze3d.pipeline.BlendFunction;
 import com.mojang.blaze3d.pipeline.RenderPipeline;
-import com.mojang.blaze3d.platform.DepthTestFunction;
 import com.mojang.blaze3d.platform.DestFactor;
 import com.mojang.blaze3d.platform.SourceFactor;
 import com.mojang.blaze3d.shaders.UniformType;
@@ -11,7 +10,7 @@ import net.minecraft.client.renderer.rendertype.RenderSetup;
 import net.minecraft.client.renderer.rendertype.RenderType;
 import net.minecraft.resources.Identifier;
 
-/** Additive, depth-tested, fog-aware light for hit sparks; shapes are procedural in spark.fsh. */
+/** Additive, depth-tested light for hit sparks; shapes are procedural in spark.fsh. */
 public final class SparkPipelines {
 	private static final BlendFunction ADDITIVE = new BlendFunction(SourceFactor.ONE, DestFactor.ONE);
 
@@ -32,11 +31,10 @@ public final class SparkPipelines {
 				.withFragmentShader(shader)
 				.withUniform("DynamicTransforms", UniformType.UNIFORM_BUFFER)
 				.withUniform("Projection", UniformType.UNIFORM_BUFFER)
-				.withUniform("Fog", UniformType.UNIFORM_BUFFER)
 				.withBlend(ADDITIVE)
 				.withVertexFormat(KroPipelines.GLYPH_FORMAT, VertexFormat.Mode.QUADS)
 				.withCull(false)
-				.withDepthWrite(false)
-				.withDepthTestFunction(DepthTestFunction.LEQUAL_DEPTH_TEST);
+				// depth tested with the builder's default (less-or-equal) so sparks hide behind blocks
+				.withDepthWrite(false);
 	}
 }

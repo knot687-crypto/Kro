@@ -87,9 +87,9 @@ public final class Kro implements ClientModInitializer {
 
 	private void endTick(Minecraft mc) {
 		jumpReset.endTick(mc);
-		if (modules.ui.background.is("Picture")) {
+		if (modules.ui.window.is("Picture")) {
 			// keeps the picture decoded and sized for the current window, off the render thread
-			wallpaper.get(KroScreen.pixelHeight(mc));
+			wallpaper.get(KroScreen.pictureWidth(mc));
 		}
 		if (saveDue > 0L && System.currentTimeMillis() >= saveDue) {
 			saveDue = -1L;

@@ -39,17 +39,20 @@ public final class PreviewMenu {
 		modules.triggerbot.bind().set(82);
 
 		KroMenu menu = new KroMenu(modules, UiHost.NONE);
+		menu.setDim(modules.ui.dim.floatValue() / 100f);
 		if (wallpaperPath != null) {
+			// mirrors WallpaperTexture.build
 			long t0 = System.nanoTime();
 			Picture source = Picture.read(new FileInputStream(wallpaperPath));
-			int ph = gh * gs;
-			int pw = Math.max(1, Math.round(ph * source.aspect()));
-			Picture sized = source.resize(pw, ph);
-			float[] span = source.subjectSpan();
-			System.out.printf("wallpaper %dx%d -> %dx%d in %.0f ms, subject %s%n", source.width, source.height, pw, ph,
-					(System.nanoTime() - t0) / 1e6, span == null ? "none" : String.format("%.3f..%.3f", span[0], span[1]));
-			float l = span != null ? span[0] : 0.15f, r = span != null ? span[1] : 0.85f;
-			menu.setWallpaper(new Wallpaper(PreviewImage.of(sized), pw, ph, l, r));
+			int w = KroMenu.windowPixelWidth(gw, gh, gs);
+			int h = Math.max(1, Math.round(w / source.aspect()));
+			Picture sharp = source.resize(w, h);
+			int fw = Math.max(1, w / 2), fh = Math.max(1, h / 2);
+			Picture frost = sharp.resize(fw, fh).blur(9f * fw / 744f).glassTone(0.035f, 0.14f, 1.18f);
+			float[] focus = source.focus();
+			System.out.printf("wallpaper %dx%d -> %dx%d (+frost %dx%d) in %.0f ms, focus %.3f, %.3f%n", source.width, source.height,
+					w, h, fw, fh, (System.nanoTime() - t0) / 1e6, focus[0], focus[1]);
+			menu.setWallpaper(new Wallpaper(PreviewImage.of(sharp), PreviewImage.of(frost), w, h, focus[0], focus[1]));
 		}
 		Canvas canvas = new Canvas();
 		SoftwareBackend scratch = new SoftwareBackend(4, 4, gs);
@@ -90,7 +93,7 @@ public final class PreviewMenu {
 		}
 		SoftwareBackend be = new SoftwareBackend(gw * gs, gh * gs, gs);
 		if (!backdrop.equals("none")) {
-			be.background(Backdrop.make(new File(backdrop), gw * gs, gh * gs, 9 * gs, 0.0f));
+			be.background(Backdrop.make(new File(backdrop), gw * gs, gh * gs, 5 * gs, 0.0f));
 		}
 		canvas.begin(be, gs, gw, gh);
 		Clock.advance(16_666_667L);

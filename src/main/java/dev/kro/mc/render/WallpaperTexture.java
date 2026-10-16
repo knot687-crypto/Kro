@@ -17,29 +17,35 @@ import java.nio.file.Path;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * The picture behind the menu. It is decoded once, then resampled on a worker thread to the
- * screen's exact pixel height whenever that changes, so it is always drawn one texel per pixel:
- * crisp at 1080p, 1440p and 4K alike. Only the GPU upload happens on the render thread.
+ * The picture that fills the menu window. Decoded once, then for every window size resampled
+ * on a worker thread to the window's exact pixel width, so it is drawn one texel per pixel and
+ * stays crisp at any resolution, along with a frosted copy for the glass surfaces on top of it.
+ * Only the GPU uploads happen on the render thread.
  * <p>
  * A {@code wallpaper.png} / {@code .jpg} in {@code config/kro} replaces the bundled picture.
  */
 public final class WallpaperTexture {
 	private static final String BUNDLED = "/assets/kro/wallpaper/default.png";
 	private static final String[] CUSTOM = {"wallpaper.png", "wallpaper.jpg", "wallpaper.jpeg"};
+	/** Frost blur in design units: the same softness on every screen. */
+	private static final float FROST = 9f;
+	/** The menu window's design width the frost is tuned at. */
+	private static final float DESIGN_WINDOW = 744f;
 
 	private final Path dir;
 	private Path customPath;
 	private long customStamp;
 	private CompletableFuture<Source> source;
 	private CompletableFuture<Sized> job;
-	private int builtHeight = -1;
+	private int builtWidth = -1;
 	private DynamicTexture texture;
+	private DynamicTexture glassTexture;
 	private Wallpaper current;
 
-	private record Source(Picture picture, float subjectLeft, float subjectRight) {
+	private record Source(Picture picture, float focusX, float focusY) {
 	}
 
-	private record Sized(NativeImage image, int width, int height, Source source) {
+	private record Sized(NativeImage image, NativeImage glass, int width, int height, Source source) {
 	}
 
 	/** A texture the GUI can draw directly. */
@@ -86,7 +92,7 @@ public final class WallpaperTexture {
 			customPath = path;
 			customStamp = stamp;
 			source = CompletableFuture.supplyAsync(() -> load(path));
-			builtHeight = -1;
+			builtWidth = -1;
 		}
 	}
 
@@ -109,16 +115,16 @@ public final class WallpaperTexture {
 				throw new IllegalStateException("Kro's bundled wallpaper is unreadable", e);
 			}
 		}
-		float[] span = picture.subjectSpan();
-		return span != null ? new Source(picture, span[0], span[1]) : new Source(picture, 0.15f, 0.85f);
+		float[] focus = picture.focus();
+		return new Source(picture, focus[0], focus[1]);
 	}
 
 	/**
-	 * The wallpaper for a screen {@code pixelHeight} pixels tall. Returns a wallpaper without an
-	 * image while the first texture is prepared (so the layout is already right), the previous
-	 * size while a new one is resampled, and {@code null} if no picture could be loaded.
+	 * The window picture for a window {@code pixelWidth} pixels wide: the previous size while a
+	 * new one is resampled, a wallpaper without images while the very first is prepared, and
+	 * {@code null} if no picture could be loaded at all.
 	 */
-	public Wallpaper get(int pixelHeight) {
+	public Wallpaper get(int pixelWidth) {
 		if (source == null) {
 			refresh();
 		}
@@ -136,48 +142,57 @@ public final class WallpaperTexture {
 				install(sized);
 			}
 		}
-		pixelHeight = Math.max(1, Math.min(pixelHeight, 8192));
-		if (builtHeight != pixelHeight && job == null) {
-			int h = pixelHeight;
-			int w = Math.max(1, Math.round(h * src.picture().aspect()));
-			job = CompletableFuture.supplyAsync(() -> toNative(src, w, h));
-			if (current == null || current.image() == null) {
-				current = new Wallpaper(null, w, h, src.subjectLeft(), src.subjectRight());
+		pixelWidth = Math.max(16, Math.min(pixelWidth, 8192));
+		if (builtWidth != pixelWidth && job == null) {
+			int w = pixelWidth;
+			int h = Math.max(1, Math.round(w / src.picture().aspect()));
+			job = CompletableFuture.supplyAsync(() -> build(src, w, h));
+			if (current == null) {
+				current = new Wallpaper(null, null, w, h, src.focusX(), src.focusY());
 			}
-			builtHeight = h;
+			builtWidth = w;
 		}
 		return current;
 	}
 
-	private static Sized toNative(Source src, int w, int h) {
-		Picture sized = src.picture().resize(w, h);
-		NativeImage image = new NativeImage(w, h, false);
-		int[] px = sized.argb;
-		for (int y = 0; y < h; y++) {
-			int row = y * w;
-			for (int x = 0; x < w; x++) {
+	private static Sized build(Source src, int w, int h) {
+		Picture sharp = src.picture().resize(w, h);
+		int gw = Math.max(1, w / 2), gh = Math.max(1, h / 2);
+		float sigma = FROST * gw / DESIGN_WINDOW;
+		Picture frost = sharp.resize(gw, gh).blur(sigma).glassTone(0.035f, 0.14f, 1.18f);
+		return new Sized(toNative(sharp), toNative(frost), w, h, src);
+	}
+
+	private static NativeImage toNative(Picture p) {
+		NativeImage image = new NativeImage(p.width, p.height, false);
+		int[] px = p.argb;
+		for (int y = 0; y < p.height; y++) {
+			int row = y * p.width;
+			for (int x = 0; x < p.width; x++) {
 				image.setPixel(x, y, px[row + x]);
 			}
 		}
-		return new Sized(image, w, h, src);
+		return image;
 	}
 
 	private void install(Sized sized) {
 		if (source.getNow(null) != sized.source()) {
 			// a newer picture replaced this one while it was being resampled
 			sized.image().close();
+			sized.glass().close();
 			return;
 		}
-		DynamicTexture next = new DynamicTexture(() -> "kro_wallpaper", sized.image());
+		DynamicTexture sharp = new DynamicTexture(() -> "kro_wallpaper", sized.image());
+		DynamicTexture frost = new DynamicTexture(() -> "kro_wallpaper_glass", sized.glass());
 		if (texture != null) {
 			texture.close();
 		}
-		texture = next;
-		current = new Wallpaper(new Image(next), sized.width(), sized.height(), sized.source().subjectLeft(), sized.source().subjectRight());
-	}
-
-	/** True when a picture is loaded and drawable. */
-	public boolean ready() {
-		return current != null && current.image() != null;
+		if (glassTexture != null) {
+			glassTexture.close();
+		}
+		texture = sharp;
+		glassTexture = frost;
+		Source src = sized.source();
+		current = new Wallpaper(new Image(sharp), new Image(frost), sized.width(), sized.height(), src.focusX(), src.focusY());
 	}
 }

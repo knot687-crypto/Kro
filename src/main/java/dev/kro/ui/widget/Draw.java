@@ -40,9 +40,18 @@ public final class Draw {
 	/** Switch. {@code on} and {@code hover} are animated 0..1 values. */
 	public static void toggle(Canvas c, float x, float y, float on, float hover) {
 		float w = TOGGLE_W, h = TOGGLE_H;
+		float t = Math.max(0f, Math.min(1f, on));
+		if (t > 0.01f) {
+			// the lit track blooms softly into its surroundings
+			c.shadow(x, y + 1f, w, h, h / 2f, 7f, Theme.accent(0.42f * t));
+		}
 		int off = Colors.lerp(0x29FFFFFF, 0x38FFFFFF, hover);
-		int track = Colors.lerp(off, Theme.accent(), Math.max(0f, Math.min(1f, on)));
-		c.rect(x, y, w, h, h / 2f, track);
+		int top = Colors.lerp(off, Theme.accentLight(), t);
+		int bottom = Colors.lerp(off, Theme.accent(), t);
+		c.rect(x, y, w, h, h / 2f, top, top, bottom, bottom);
+		if (t > 0.01f) {
+			c.outline(x, y, w, h, h / 2f, 1f, Colors.withAlpha(0xFFFFFF, 0.22f * t), Colors.withAlpha(0xFFFFFF, 0.22f * t), 0x00FFFFFF, 0x00FFFFFF);
+		}
 		float knob = h - 4f;
 		float kx = x + 2f + (w - knob - 4f) * on + knob / 2f;
 		float ky = y + h / 2f;

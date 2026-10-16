@@ -43,11 +43,11 @@ public class KroScreenshotTest implements FabricClientGameTest {
 			context.waitTicks(20);
 			closeMenu(context);
 
-			context.runOnClient(mc -> Kro.get().modules.ui.background.set("Blur"));
+			context.runOnClient(mc -> Kro.get().modules.ui.window.set("Black"));
 			openMenu(context);
-			context.takeScreenshot("05-menu-blur");
+			context.takeScreenshot("05-menu-black");
 			closeMenu(context);
-			context.runOnClient(mc -> Kro.get().modules.ui.background.set("Picture"));
+			context.runOnClient(mc -> Kro.get().modules.ui.window.set("Picture"));
 
 			context.setScreen(HudEditorScreen::new);
 			context.waitTicks(30);
