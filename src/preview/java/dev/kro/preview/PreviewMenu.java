@@ -7,6 +7,7 @@ import dev.kro.ui.menu.KroMenu;
 import dev.kro.ui.menu.Wallpaper;
 import dev.kro.ui.render.Canvas;
 import dev.kro.ui.render.Picture;
+import dev.kro.ui.render.RenderBackend;
 import dev.kro.ui.render.Theme;
 
 import java.io.File;
@@ -18,16 +19,30 @@ import java.io.FileInputStream;
  * Scenarios: grid, hover, tab:N, page:N (card index), search:text
  */
 public final class PreviewMenu {
-	public static void main(String[] args) throws Exception {
-		String scenario = args[0];
-		int gs = Integer.parseInt(args[1]);
-		int gw = Integer.parseInt(args[2]);
-		int gh = Integer.parseInt(args[3]);
-		String backdrop = args[4];
-		File out = new File(args[5]);
-		String accent = args.length > 6 ? args[6] : "Iris";
-		String wallpaperPath = args.length > 7 ? args[7] : null;
+	/** A menu driven into a scenario, ready to draw its next frame into any backend. */
+	static final class Scene {
+		final KroMenu menu;
+		final Canvas canvas = new Canvas();
+		final float[] mouse;
+		final int gs;
+		final int gw;
+		final int gh;
 
+		Scene(KroMenu menu, float[] mouse, int gs, int gw, int gh) {
+			this.menu = menu;
+			this.mouse = mouse;
+			this.gs = gs;
+			this.gw = gw;
+			this.gh = gh;
+		}
+
+		void render(RenderBackend backend) {
+			canvas.begin(backend, gs, gw, gh);
+			menu.render(canvas, gw, gh, mouse[0], mouse[1], 1f);
+		}
+	}
+
+	static Scene scene(String scenario, int gs, int gw, int gh, String accent, String wallpaperPath) throws Exception {
 		Clock.setFixed(System.nanoTime());
 		ModuleRegistry modules = new ModuleRegistry();
 		modules.ui.accent.set(accent);
@@ -52,13 +67,11 @@ public final class PreviewMenu {
 			System.out.printf("wallpaper %dx%d -> %dx%d in %.0f ms%n", source.width, source.height, w, h, (System.nanoTime() - t0) / 1e6);
 			menu.setWallpaper(new Wallpaper(PreviewImage.of(sharp), PreviewImage.of(tinted), w, h));
 		}
-		Canvas canvas = new Canvas();
+		Scene s = new Scene(menu, new float[] {gw / 2f, gh / 2f}, gs, gw, gh);
 		SoftwareBackend scratch = new SoftwareBackend(4, 4, gs);
-		float[] mouse = {gw / 2f, gh / 2f};
 		Runnable frame = () -> {
 			Clock.advance(16_666_667L);
-			canvas.begin(scratch, gs, gw, gh);
-			menu.render(canvas, gw, gh, mouse[0], mouse[1], 1f);
+			s.render(scratch);
 		};
 		for (int i = 0; i < 80; i++) {
 			frame.run();
@@ -66,8 +79,8 @@ public final class PreviewMenu {
 
 		if (scenario.equals("hover")) {
 			float[] p = menu.cardCentre(4);
-			mouse[0] = p[0];
-			mouse[1] = p[1];
+			s.mouse[0] = p[0];
+			s.mouse[1] = p[1];
 		} else if (scenario.startsWith("tab:")) {
 			int t = Integer.parseInt(scenario.substring(4));
 			// cycle with the Tab key
@@ -79,8 +92,8 @@ public final class PreviewMenu {
 			float[] p = menu.cardCentre(idx);
 			menu.mouseClicked(p[0], p[1] + 20f, 0, false);
 			menu.mouseReleased(p[0], p[1] + 20f, 0);
-			mouse[0] = gw * 0.3f;
-			mouse[1] = gh * 0.45f;
+			s.mouse[0] = gw * 0.3f;
+			s.mouse[1] = gh * 0.45f;
 		} else if (scenario.startsWith("search:")) {
 			for (char ch : scenario.substring(7).toCharArray()) {
 				menu.charTyped(ch);
@@ -89,13 +102,26 @@ public final class PreviewMenu {
 		for (int i = 0; i < 75; i++) {
 			frame.run();
 		}
+		Clock.advance(16_666_667L);
+		return s;
+	}
+
+	public static void main(String[] args) throws Exception {
+		String scenario = args[0];
+		int gs = Integer.parseInt(args[1]);
+		int gw = Integer.parseInt(args[2]);
+		int gh = Integer.parseInt(args[3]);
+		String backdrop = args[4];
+		File out = new File(args[5]);
+		String accent = args.length > 6 ? args[6] : "Iris";
+		String wallpaperPath = args.length > 7 ? args[7] : null;
+
+		Scene s = scene(scenario, gs, gw, gh, accent, wallpaperPath);
 		SoftwareBackend be = new SoftwareBackend(gw * gs, gh * gs, gs);
 		if (!backdrop.equals("none")) {
 			be.background(Backdrop.make(new File(backdrop), gw * gs, gh * gs, 5 * gs, 0.0f));
 		}
-		canvas.begin(be, gs, gw, gh);
-		Clock.advance(16_666_667L);
-		menu.render(canvas, gw, gh, mouse[0], mouse[1], 1f);
+		s.render(be);
 		be.save(out);
 		System.out.println("wrote " + out);
 	}
