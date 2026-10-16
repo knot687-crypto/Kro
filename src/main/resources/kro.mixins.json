@@ -4,7 +4,15 @@
 	"package": "dev.kro.mixin",
 	"compatibilityLevel": "JAVA_21",
 	"client": [
-		"MinecraftClientMixin"
+		"ClientLevelDataMixin",
+		"ClientLevelMixin",
+		"FogRendererMixin",
+		"KeyboardHandlerMixin",
+		"KeyMappingMixin",
+		"LevelMixin",
+		"MouseHandlerMixin",
+		"MultiPlayerGameModeMixin",
+		"OptionsMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

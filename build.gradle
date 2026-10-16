@@ -22,11 +22,26 @@ fabricApi {
 	}
 }
 
+// The Fabric API modules Kro uses are nested inside the jar, so players only need Fabric Loader.
+def apiModules = [
+		'fabric-api-base',
+		'fabric-resource-loader-v1',
+		'fabric-lifecycle-events-v1',
+		'fabric-rendering-v1',
+]
+
 dependencies {
 	minecraft "com.mojang:minecraft:${project.minecraft_version}"
-	mappings "net.fabricmc:yarn:${project.yarn_mappings}:v2"
+	mappings loom.officialMojangMappings()
 	modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
-	modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+
+	apiModules.each {
+		include(modImplementation(fabricApi.module(it, project.fabric_api_version)))
+	}
+
+	// full Fabric API only for development runs and the visual test harness
+	modLocalRuntime "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+	modGametestImplementation fabricApi.module('fabric-client-gametest-api-v1', project.fabric_api_version)
 }
 
 processResources {
