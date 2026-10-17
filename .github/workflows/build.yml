@@ -30,3 +30,73 @@ jobs:
         with:
           name: kro-jar
           path: build/libs/*.jar
+
+      # Temporary: print exact 1.21.11 signatures used by new features
+      - name: API probe
+        if: always()
+        continue-on-error: true
+        run: |
+          echo "--- candidate jars"
+          find ~/.gradle/caches/fabric-loom "$GITHUB_WORKSPACE/.gradle" -name "*.jar" 2>/dev/null | grep -i "minecraft" | grep -v -i "sources" | head -20
+          J=$(find ~/.gradle/caches/fabric-loom "$GITHUB_WORKSPACE/.gradle" -name "minecraft-merged*.jar" 2>/dev/null | grep "loom.mappings" | grep -v -i sources | head -1)
+          [ -z "$J" ] && J=$(find ~/.gradle/caches/fabric-loom "$GITHUB_WORKSPACE/.gradle" -name "minecraft-*.jar" 2>/dev/null | grep "mappings" | grep -v -i sources | head -1)
+          echo "--- using $J"
+          sig() { echo "=== SIG $1"; javap -p -cp "$J" "$1" 2>&1 | grep -E -- "${2:-.}"; }
+          code() { echo "=== CODE $1 :: $2"; javap -p -c -cp "$J" "$1" 2>&1 | awk -v pat="$2(" 'index($0, pat) && !inm && $0 ~ /^  [a-z]/ {inm=1} inm {print} inm && /^$/ {inm=0}'; }
+          echo "--- packages"
+          unzip -l "$J" | awk '{print $4}' | grep -E "client/renderer/feature/|boss/enderdragon/EndCrystal|item/EndCrystalItem|block/RespawnAnchorBlock|ExplosionParticleInfo|renderer/SubmitNodeCollector|ItemActivation" | head -80
+          sig net.minecraft.client.particle.ParticleEngine
+          sig net.minecraft.client.multiplayer.ClientPacketListener "handleExplosion|handleEntityEvent|findTotem|handleParticleEvent|level;|minecraft;"
+          code net.minecraft.client.multiplayer.ClientPacketListener handleExplosion
+          code net.minecraft.client.multiplayer.ClientPacketListener handleEntityEvent
+          sig net.minecraft.network.protocol.game.ClientboundExplodePacket
+          sig net.minecraft.network.protocol.game.ClientboundEntityEventPacket
+          sig net.minecraft.client.renderer.ScreenEffectRenderer
+          code net.minecraft.client.renderer.ScreenEffectRenderer renderFire
+          code net.minecraft.client.renderer.ScreenEffectRenderer renderScreenEffect
+          sig net.minecraft.client.renderer.GameRenderer "temActivation"
+          code net.minecraft.client.renderer.GameRenderer renderItemActivationAnimation
+          sig net.minecraft.client.renderer.ItemInHandRenderer
+          code net.minecraft.client.renderer.ItemInHandRenderer renderArmWithItem
+          for c in $(unzip -l "$J" | awk '{print $4}' | grep -E "client/renderer/feature/[A-Za-z]*Flame[A-Za-z]*\.class$|client/renderer/feature/FeatureRenderDispatcher\.class$" | sed 's/\.class$//; s#/#.#g'); do sig "$c"; done
+          for c in $(unzip -l "$J" | awk '{print $4}' | grep -E "client/renderer/feature/[A-Za-z]*Flame[A-Za-z]*\.class$" | sed 's/\.class$//; s#/#.#g'); do javap -p -c -cp "$J" "$c" | head -400; done
+          sig net.minecraft.client.renderer.SubmitNodeCollector "lame"
+          sig net.minecraft.client.renderer.SubmitNodeStorage "lame"
+          sig net.minecraft.client.renderer.entity.EntityRenderDispatcher "lame|ire"
+          code net.minecraft.client.renderer.entity.EntityRenderDispatcher submit
+          sig net.minecraft.client.renderer.entity.state.EntityRenderState
+          sig net.minecraft.client.renderer.entity.EntityRenderer "lame|ire|extractRenderState"
+          sig net.minecraft.client.multiplayer.MultiPlayerGameMode
+          sig net.minecraft.world.entity.player.Inventory
+          sig net.minecraft.world.inventory.InventoryMenu
+          sig net.minecraft.world.inventory.ClickType
+          sig net.minecraft.world.inventory.AbstractContainerMenu "containerId|getCarried|slots|getSlot"
+          sig net.minecraft.world.level.block.RespawnAnchorBlock
+          code net.minecraft.world.level.block.RespawnAnchorBlock useItemOn
+          code net.minecraft.world.level.block.RespawnAnchorBlock useWithoutItem
+          code net.minecraft.world.level.block.RespawnAnchorBlock canSetSpawn
+          sig net.minecraft.world.item.EndCrystalItem
+          code net.minecraft.world.item.EndCrystalItem useOn
+          sig net.minecraft.world.entity.boss.enderdragon.EndCrystal
+          sig net.minecraft.client.Minecraft "startUseItem|startAttack|rightClickDelay|missTime|handleKeybinds|hitResult|gameMode|player;"
+          code net.minecraft.client.Minecraft startUseItem
+          sig net.minecraft.world.InteractionResult
+          sig 'net.minecraft.world.InteractionResult$Success'
+          sig net.minecraft.world.InteractionHand
+          sig net.minecraft.client.gui.screens.inventory.AbstractContainerScreen "hoveredSlot|menu;|getSlotUnderMouse"
+          sig net.minecraft.client.gui.screens.inventory.InventoryScreen "class|InventoryScreen("
+          sig net.minecraft.world.entity.LivingEntity "hasEffect|getOffhandItem|getMainHandItem|getItemInHand|handleEntityEvent"
+          sig net.minecraft.world.entity.Entity "isOnFire|displayFireAnimation|getRemainingFireTicks|fireImmune|getBbHeight|getBbWidth|position\(|blockPosition|getEyePosition"
+          sig net.minecraft.world.effect.MobEffects "FIRE_RESISTANCE"
+          sig net.minecraft.core.particles.ParticleTypes "EXPLOSION|POOF|SMOKE "
+          sig net.minecraft.client.multiplayer.ClientLevel "addParticle|addAlwaysVisibleParticle"
+          sig net.minecraft.client.renderer.LevelRenderer "article"
+          sig net.minecraft.client.gui.GuiGraphics "renderItem|renderFakeItem|renderItemDecorations|pose\(|nextStratum"
+          sig net.minecraft.world.level.Level "dimension\(|NETHER|getBlockState|isEmptyBlock|getEntities\("
+          sig net.minecraft.world.entity.player.Player "getInventory|inventoryMenu|containerMenu|getAttackStrengthScale"
+          sig net.minecraft.world.item.ItemStack "is\(|getCount|isEmpty"
+          sig net.minecraft.world.item.Items "END_CRYSTAL|RESPAWN_ANCHOR|GLOWSTONE |TOTEM_OF_UNDYING|OBSIDIAN"
+          sig net.minecraft.world.level.block.Blocks "OBSIDIAN|BEDROCK|RESPAWN_ANCHOR|GLOWSTONE "
+          sig net.minecraft.world.phys.BlockHitResult
+          sig net.minecraft.client.renderer.entity.ItemRenderer "renderStatic|render\("
+          sig net.minecraft.world.item.ItemDisplayContext
