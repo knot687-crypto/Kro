@@ -97,7 +97,9 @@ final class ModuleCard {
 		// name and switch
 		float ty = py + TITLE_Y;
 		float nameMax = w - PAD * 2f - (module.alwaysOn() ? 0f : Draw.TOGGLE_W + 10f);
-		c.text(Fonts.semibold(), 11f, c.ellipsize(Fonts.semibold(), 11f, module.name(), nameMax), px + PAD, ty, Theme.TEXT);
+		// a long name steps down a little in size before it would be cut short
+		float nameSize = Math.max(9.5f, Math.min(11f, 11f * nameMax / Math.max(1f, c.textWidth(Fonts.semibold(), 11f, module.name()))));
+		c.text(Fonts.semibold(), nameSize, c.ellipsize(Fonts.semibold(), nameSize, module.name(), nameMax), px + PAD, ty, Theme.TEXT);
 		if (!module.alwaysOn()) {
 			Draw.toggle(c, px + w - PAD - Draw.TOGGLE_W, ty - Draw.TOGGLE_H / 2f, onT, Math.max(sw, hv * 0.4f));
 		}

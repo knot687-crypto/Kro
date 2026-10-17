@@ -1,6 +1,10 @@
 package dev.kro.mixin;
 
+import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import com.llamalad7.mixinextras.injector.v2.WrapWithCondition;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
+import com.llamalad7.mixinextras.sugar.Local;
 import dev.kro.Kro;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -19,9 +23,12 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
+import java.util.Optional;
+
 /**
- * Explosion and entity events as they reach the client: No Explosions drops the visual parts of
- * a blast (sound and knockback are untouched), and totem pops and deaths feed Kro's effects.
+ * Explosion, motion and entity events as they reach the client: No Explosions drops the visual
+ * parts of a blast, Anti Knockback scales the push you are given, and totem pops and deaths feed
+ * Kro's effects.
  */
 @Mixin(ClientPacketListener.class)
 public abstract class ClientPacketListenerMixin {
@@ -42,6 +49,20 @@ public abstract class ClientPacketListenerMixin {
 	private boolean kro$blastDebris(ClientLevel level, Vec3 center, float radius, int blockCount, WeightedList<ExplosionParticleInfo> particles) {
 		Kro kro = Kro.get();
 		return kro == null || !kro.modules.noExplosions.enabled() || !kro.modules.noExplosions.debris.on();
+	}
+
+	@ModifyExpressionValue(method = "handleExplosion", at = @At(value = "INVOKE",
+			target = "Lnet/minecraft/network/protocol/game/ClientboundExplodePacket;playerKnockback()Ljava/util/Optional;"))
+	private Optional<Vec3> kro$blastPush(Optional<Vec3> push, @Local(argsOnly = true) ClientboundExplodePacket packet) {
+		Kro kro = Kro.get();
+		return kro == null ? push : kro.antiKnockback.explosion(push, packet.explosionParticle());
+	}
+
+	@WrapOperation(method = "handleSetEntityMotion", at = @At(value = "INVOKE",
+			target = "Lnet/minecraft/world/entity/Entity;lerpMotion(Lnet/minecraft/world/phys/Vec3;)V"))
+	private void kro$motion(Entity entity, Vec3 motion, Operation<Void> original) {
+		Kro kro = Kro.get();
+		original.call(entity, kro == null ? motion : kro.antiKnockback.motion(entity, motion));
 	}
 
 	@Inject(method = "handleExplosion", at = @At("TAIL"))

@@ -5,13 +5,18 @@ import dev.kro.core.config.ConfigIO;
 import dev.kro.core.module.Module;
 import dev.kro.core.module.ModuleRegistry;
 import dev.kro.mc.feature.AimAssistController;
+import dev.kro.mc.feature.AntiKnockbackController;
 import dev.kro.mc.feature.AutoAnchorController;
 import dev.kro.mc.feature.AutoCrystalController;
+import dev.kro.mc.feature.AutoHitCrystalController;
 import dev.kro.mc.feature.AutoTotemController;
 import dev.kro.mc.feature.HitSparksController;
 import dev.kro.mc.feature.JumpResetController;
+import dev.kro.mc.feature.MaceSwapController;
+import dev.kro.mc.feature.ShortWindChargeController;
 import dev.kro.mc.feature.TargetTracker;
 import dev.kro.mc.feature.TriggerbotController;
+import dev.kro.mc.feature.WTapController;
 import dev.kro.mc.feature.WorldThemeController;
 import dev.kro.mc.fx.WorldEffects;
 import dev.kro.mc.hud.HudLayer;
@@ -51,6 +56,11 @@ public final class Kro implements ClientModInitializer {
 	public final AutoCrystalController autoCrystal = new AutoCrystalController(this);
 	public final AutoAnchorController autoAnchor = new AutoAnchorController(this);
 	public final AutoTotemController autoTotem = new AutoTotemController(this);
+	public final AutoHitCrystalController hitCrystal = new AutoHitCrystalController(this);
+	public final WTapController wTap = new WTapController(this);
+	public final MaceSwapController maceSwap = new MaceSwapController(this);
+	public final ShortWindChargeController windCharge = new ShortWindChargeController(this);
+	public final AntiKnockbackController antiKnockback = new AntiKnockbackController(this);
 	public final WorldEffects effects = new WorldEffects(this);
 	public final KeyBinds keys = new KeyBinds(this);
 	public WallpaperTexture wallpaper;
@@ -90,16 +100,24 @@ public final class Kro implements ClientModInitializer {
 	private void startTick(Minecraft mc) {
 		applyInterface();
 		jumpReset.startTick(mc);
+		wTap.startTick(mc);
+		maceSwap.tick(mc);
 		autoTotem.tick(mc);
-		autoAnchor.tick(mc);
-		autoCrystal.tick(mc);
-		triggerbot.tick(mc);
+		windCharge.startTick(mc);
+		if (!windCharge.throwing()) {
+			// a throw owns this tick's hotbar and clicks; the other macros carry on next tick
+			autoAnchor.tick(mc);
+			autoCrystal.tick(mc);
+			hitCrystal.tick(mc);
+			triggerbot.tick(mc);
+		}
 		worldTheme.tick(mc);
 		targets.tick(mc);
 	}
 
 	private void endTick(Minecraft mc) {
 		jumpReset.endTick(mc);
+		windCharge.endTick(mc);
 		effects.tick(mc);
 		if (modules.ui.window.is("Picture")) {
 			// keeps the picture decoded and sized for the current window, off the render thread

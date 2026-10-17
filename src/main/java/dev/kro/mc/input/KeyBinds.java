@@ -31,6 +31,7 @@ public final class KeyBinds {
 			mc.setScreen(new KroScreen());
 			return true;
 		}
+		kro.windCharge.onKey(key);
 		return toggleBound(key);
 	}
 
@@ -43,6 +44,7 @@ public final class KeyBinds {
 		if (button == 0) {
 			lastAttackClick = System.currentTimeMillis();
 		}
+		kro.windCharge.onKey(Keys.MOUSE_BASE + button);
 		if (button >= 2) {
 			toggleBound(Keys.MOUSE_BASE + button);
 		}

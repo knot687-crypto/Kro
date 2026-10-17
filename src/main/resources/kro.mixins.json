@@ -11,9 +11,11 @@
 		"FogRendererMixin",
 		"ItemInHandRendererMixin",
 		"KeyboardHandlerMixin",
+		"KeyMappingAccessor",
 		"KeyMappingMixin",
 		"LevelMixin",
 		"MouseHandlerMixin",
+		"MultiPlayerGameModeAccessor",
 		"MultiPlayerGameModeMixin",
 		"OptionsMixin",
 		"ScreenEffectRendererMixin"

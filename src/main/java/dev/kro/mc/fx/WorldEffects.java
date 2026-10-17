@@ -38,8 +38,9 @@ import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * Connects Kro's world effects ({@link Effects}) to the game: totem pops, deaths, jumps and
- * explosions start effects, your opponent gets a halo, players leave trails, and every frame the
- * light is drawn after the opaque world. Purely visual; it exists only on your screen.
+ * explosions start effects, your opponent gets a halo, players leave trails, your shot shows its
+ * arc, and every frame the light is drawn after the opaque world. Purely visual; it exists only
+ * on your screen.
  */
 public final class WorldEffects {
 	private static final long KILL_CREDIT_MS = 5000L;
@@ -56,6 +57,7 @@ public final class WorldEffects {
 	private final Map<Integer, Double> lastY = new HashMap<>();
 	private final Map<Integer, Effects.Trail> trails = new HashMap<>();
 	private final Effects.Halo halo = new Effects.Halo();
+	private final Trajectory trajectory = new Trajectory();
 	private EntityAnchor haloAnchor;
 	private ClientLevel level;
 	private float partialTick = 1f;
@@ -259,6 +261,7 @@ public final class WorldEffects {
 		}
 		halo.draw(fx, haloAnchor, ring.style.get(), ring.palette.get(), ring.customColor.color(), ring.speed.value(), ring.hurtFlash.on(), dt, pt, clock);
 		drawTrails(mc, pt);
+		trajectory.draw(fx, kro.modules.bowTrajectory, mc, pt, clock);
 
 		Iterator<Effects.Effect> it = effects.iterator();
 		while (it.hasNext()) {

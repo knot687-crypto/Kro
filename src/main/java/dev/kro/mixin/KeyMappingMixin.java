@@ -9,8 +9,9 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /**
- * Sprint and Jump Reset act by holding the real keys, so every vanilla rule (hunger, blindness,
- * sneaking, using items, ground checks) still decides what actually happens.
+ * Sprint, Jump Reset, W Tap and Short Wind Charge act by holding or releasing the real keys, so
+ * every vanilla rule (hunger, blindness, sneaking, using items, ground checks) still decides what
+ * actually happens. Auto Hit Crystal hides the held right button while it places.
  */
 @Mixin(KeyMapping.class)
 public abstract class KeyMappingMixin {
@@ -22,10 +23,14 @@ public abstract class KeyMappingMixin {
 			return;
 		}
 		Object self = this;
-		if (self == mc.options.keySprint && kro.modules.sprint.enabled() && mc.screen == null) {
+		if (self == mc.options.keySprint && (kro.modules.sprint.enabled() || kro.wTap.resprinting()) && mc.screen == null) {
 			cir.setReturnValue(true);
-		} else if (self == mc.options.keyJump && kro.jumpReset.forceJump()) {
+		} else if (self == mc.options.keyJump && (kro.jumpReset.forceJump() || kro.windCharge.forceJump())) {
 			cir.setReturnValue(true);
+		} else if (self == mc.options.keyUp && kro.wTap.releasing()) {
+			cir.setReturnValue(false);
+		} else if (self == mc.options.keyUse && kro.hitCrystal.holdsUse()) {
+			cir.setReturnValue(false);
 		}
 	}
 }
