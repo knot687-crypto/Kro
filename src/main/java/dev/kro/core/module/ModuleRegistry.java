@@ -1,7 +1,6 @@
 package dev.kro.core.module;
 
 import dev.kro.core.module.impl.AimAssist;
-import dev.kro.core.module.impl.AntiKnockback;
 import dev.kro.core.module.impl.AutoAnchor;
 import dev.kro.core.module.impl.AutoCrystal;
 import dev.kro.core.module.impl.AutoHitCrystal;
@@ -9,6 +8,7 @@ import dev.kro.core.module.impl.AutoMace;
 import dev.kro.core.module.impl.AutoTotem;
 import dev.kro.core.module.impl.BowTrajectory;
 import dev.kro.core.module.impl.BreachSwap;
+import dev.kro.core.module.impl.FastPlace;
 import dev.kro.core.module.impl.HitSparks;
 import dev.kro.core.module.impl.Interface;
 import dev.kro.core.module.impl.JumpCircles;
@@ -16,8 +16,10 @@ import dev.kro.core.module.impl.JumpReset;
 import dev.kro.core.module.impl.KillEffects;
 import dev.kro.core.module.impl.LowFire;
 import dev.kro.core.module.impl.LowOnFire;
+import dev.kro.core.module.impl.NoClickDelay;
 import dev.kro.core.module.impl.NoExplosions;
 import dev.kro.core.module.impl.PopEffects;
+import dev.kro.core.module.impl.Reach;
 import dev.kro.core.module.impl.ShortWindCharge;
 import dev.kro.core.module.impl.SmallerTotem;
 import dev.kro.core.module.impl.Sprint;
@@ -25,6 +27,7 @@ import dev.kro.core.module.impl.TargetHud;
 import dev.kro.core.module.impl.TargetRing;
 import dev.kro.core.module.impl.Trails;
 import dev.kro.core.module.impl.Triggerbot;
+import dev.kro.core.module.impl.Velocity;
 import dev.kro.core.module.impl.WTap;
 import dev.kro.core.module.impl.WorldTheme;
 
@@ -36,13 +39,16 @@ public final class ModuleRegistry {
 	public final Triggerbot triggerbot = new Triggerbot();
 	public final JumpReset jumpReset = new JumpReset();
 	public final WTap wTap = new WTap();
-	public final AntiKnockback antiKnockback = new AntiKnockback();
+	public final Velocity velocity = new Velocity();
+	public final Reach reach = new Reach();
+	public final NoClickDelay noClickDelay = new NoClickDelay();
 	public final AutoMace autoMace = new AutoMace();
 	public final BreachSwap breachSwap = new BreachSwap();
 	public final AutoCrystal autoCrystal = new AutoCrystal();
 	public final AutoHitCrystal autoHitCrystal = new AutoHitCrystal();
 	public final AutoAnchor autoAnchor = new AutoAnchor();
 	public final AutoTotem autoTotem = new AutoTotem();
+	public final FastPlace fastPlace = new FastPlace();
 	public final Sprint sprint = new Sprint();
 	public final ShortWindCharge shortWindCharge = new ShortWindCharge();
 	public final HitSparks hitSparks = new HitSparks();
@@ -60,8 +66,8 @@ public final class ModuleRegistry {
 	public final Trails trails = new Trails();
 	public final Interface ui = new Interface();
 
-	private final List<Module> all = List.of(aimAssist, triggerbot, jumpReset, wTap, antiKnockback, autoMace, breachSwap,
-			autoCrystal, autoHitCrystal, autoAnchor, autoTotem, sprint, shortWindCharge,
+	private final List<Module> all = List.of(aimAssist, triggerbot, reach, velocity, jumpReset, wTap, noClickDelay, autoMace, breachSwap,
+			autoCrystal, autoHitCrystal, autoAnchor, autoTotem, fastPlace, sprint, shortWindCharge,
 			targetHud, bowTrajectory, noExplosions, smallerTotem, lowFire, lowOnFire,
 			popEffects, killEffects, hitSparks, jumpCircles, targetRing, trails, worldTheme, ui);
 

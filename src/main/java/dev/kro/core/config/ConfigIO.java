@@ -16,11 +16,14 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.Map;
 
 /** Reads and writes {@code config/kro.json}. Unknown or malformed entries are ignored. */
 public final class ConfigIO {
 	private static final int VERSION = 1;
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
+	/** Modules saved under an earlier name, so a rename keeps your settings. */
+	private static final Map<String, String> FORMER_NAMES = Map.of("Velocity", "Anti Knockback");
 
 	private ConfigIO() {
 	}
@@ -42,6 +45,9 @@ public final class ConfigIO {
 		JsonObject mods = root.has("modules") && root.get("modules").isJsonObject() ? root.getAsJsonObject("modules") : new JsonObject();
 		for (Module m : modules.all()) {
 			JsonElement me = mods.get(m.name());
+			if (me == null && FORMER_NAMES.containsKey(m.name())) {
+				me = mods.get(FORMER_NAMES.get(m.name()));
+			}
 			if (me == null || !me.isJsonObject()) {
 				continue;
 			}

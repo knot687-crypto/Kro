@@ -14,10 +14,13 @@
 		"KeyMappingAccessor",
 		"KeyMappingMixin",
 		"LevelMixin",
+		"MinecraftAccessor",
+		"MinecraftMixin",
 		"MouseHandlerMixin",
 		"MultiPlayerGameModeAccessor",
 		"MultiPlayerGameModeMixin",
 		"OptionsMixin",
+		"PlayerMixin",
 		"ScreenEffectRendererMixin"
 	],
 	"injectors": {

@@ -12,8 +12,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
  * Your attacks, just before and just after they leave the client: the Target HUD, Hit Sparks,
- * kill credit and W Tap watch them, and Auto Mace and Breach Swap put the mace in hand for the
- * blow and take it away again in the same instant.
+ * kill credit, W Tap and Reach watch them, and Auto Mace and Breach Swap put the mace in hand for
+ * the blow and take it away again in the same instant.
  */
 @Mixin(MultiPlayerGameMode.class)
 public abstract class MultiPlayerGameModeMixin {
@@ -26,6 +26,7 @@ public abstract class MultiPlayerGameModeMixin {
 			kro.hitSparks.onAttack(target);
 			kro.effects.onAttack(target);
 			kro.wTap.onAttack(mc, target);
+			kro.reach.onAttack();
 			kro.maceSwap.beforeAttack(mc, player, target);
 		}
 	}

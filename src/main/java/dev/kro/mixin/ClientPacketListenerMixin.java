@@ -27,7 +27,7 @@ import java.util.Optional;
 
 /**
  * Explosion, motion and entity events as they reach the client: No Explosions drops the visual
- * parts of a blast, Anti Knockback scales the push you are given, and totem pops and deaths feed
+ * parts of a blast, Velocity scales the push you are given, and totem pops and deaths feed
  * Kro's effects.
  */
 @Mixin(ClientPacketListener.class)
@@ -55,14 +55,14 @@ public abstract class ClientPacketListenerMixin {
 			target = "Lnet/minecraft/network/protocol/game/ClientboundExplodePacket;playerKnockback()Ljava/util/Optional;"))
 	private Optional<Vec3> kro$blastPush(Optional<Vec3> push, @Local(argsOnly = true) ClientboundExplodePacket packet) {
 		Kro kro = Kro.get();
-		return kro == null ? push : kro.antiKnockback.explosion(push, packet.explosionParticle());
+		return kro == null ? push : kro.velocity.explosion(push, packet.explosionParticle());
 	}
 
 	@WrapOperation(method = "handleSetEntityMotion", at = @At(value = "INVOKE",
 			target = "Lnet/minecraft/world/entity/Entity;lerpMotion(Lnet/minecraft/world/phys/Vec3;)V"))
 	private void kro$motion(Entity entity, Vec3 motion, Operation<Void> original) {
 		Kro kro = Kro.get();
-		original.call(entity, kro == null ? motion : kro.antiKnockback.motion(entity, motion));
+		original.call(entity, kro == null ? motion : kro.velocity.motion(entity, motion));
 	}
 
 	@Inject(method = "handleExplosion", at = @At("TAIL"))
