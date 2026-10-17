@@ -22,6 +22,7 @@ import dev.kro.core.module.impl.PopEffects;
 import dev.kro.core.module.impl.Reach;
 import dev.kro.core.module.impl.ShortWindCharge;
 import dev.kro.core.module.impl.SmallerTotem;
+import dev.kro.core.module.impl.StretchRes;
 import dev.kro.core.module.impl.Sprint;
 import dev.kro.core.module.impl.TargetHud;
 import dev.kro.core.module.impl.TargetRing;
@@ -55,6 +56,7 @@ public final class ModuleRegistry {
 	public final WorldTheme worldTheme = new WorldTheme();
 	public final TargetHud targetHud = new TargetHud();
 	public final BowTrajectory bowTrajectory = new BowTrajectory();
+	public final StretchRes stretchRes = new StretchRes();
 	public final NoExplosions noExplosions = new NoExplosions();
 	public final SmallerTotem smallerTotem = new SmallerTotem();
 	public final LowFire lowFire = new LowFire();
@@ -68,7 +70,7 @@ public final class ModuleRegistry {
 
 	private final List<Module> all = List.of(aimAssist, triggerbot, reach, velocity, jumpReset, wTap, noClickDelay, autoMace, breachSwap,
 			autoCrystal, autoHitCrystal, autoAnchor, autoTotem, fastPlace, sprint, shortWindCharge,
-			targetHud, bowTrajectory, noExplosions, smallerTotem, lowFire, lowOnFire,
+			targetHud, bowTrajectory, stretchRes, noExplosions, smallerTotem, lowFire, lowOnFire,
 			popEffects, killEffects, hitSparks, jumpCircles, targetRing, trails, worldTheme, ui);
 
 	/** Every module including client preferences. */
