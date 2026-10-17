@@ -31,3 +31,53 @@ jobs:
           name: kro-jar
           path: build/libs/*.jar
 
+
+      # Temporary: print exact 1.21.11 signatures used by new features
+      - name: API probe
+        if: always()
+        continue-on-error: true
+        run: |
+          set +e
+          J=$(find ~/.gradle/caches/fabric-loom -name "minecraft-merged*.jar" 2>/dev/null | grep "loom.mappings" | grep -v -i sources | grep -v intermediary | head -1)
+          echo "--- using $J"
+          sig() { echo "=== SIG $1"; javap -p -cp "$J" "$1" 2>&1 | grep -E -- "${2:-.}" || true; }
+          code() { echo "=== CODE $1 :: $2"; javap -p -c -cp "$J" "$1" 2>&1 | awk -v pat="$2(" 'index($0, pat) && !inm && $0 ~ /^  [a-z]/ {inm=1} inm {print} inm && /^$/ {inm=0}' || true; }
+          code net.minecraft.client.multiplayer.ClientPacketListener handleSetEntityMotion
+          sig net.minecraft.network.protocol.game.ClientboundSetEntityMotionPacket
+          sig net.minecraft.network.protocol.game.ServerboundUseItemPacket
+          code net.minecraft.client.multiplayer.MultiPlayerGameMode useItem
+          echo "=== ORDER Minecraft.tick"
+          javap -p -c -cp "$J" net.minecraft.client.Minecraft | awk '/^  public void tick\(\);/ {inm=1} inm {print} inm && /^$/ {exit}' | grep -n -E "handleKeybinds|tickEntities|gameMode.*tick|pick|Method net/minecraft/client/gui/Gui.tick" || true
+          sig net.minecraft.world.item.BowItem
+          sig net.minecraft.world.item.CrossbowItem "isCharged|POWER|getShootingPower|static"
+          sig net.minecraft.world.item.TridentItem
+          sig net.minecraft.world.item.ProjectileWeaponItem
+          sig net.minecraft.world.entity.LivingEntity "getTicksUsingItem|getUseItem|getUseItemRemainingTicks|isUsingItem|getUsedItemHand"
+          sig net.minecraft.world.entity.Entity "getDeltaMovement|getKnownMovement|onGround\(|setXRot|getXRot|getYRot|isInWater|setDeltaMovement|fallDistance"
+          sig net.minecraft.world.level.ClipContext
+          sig 'net.minecraft.world.level.ClipContext$Block'
+          sig 'net.minecraft.world.level.ClipContext$Fluid'
+          sig net.minecraft.world.level.BlockGetter "clip"
+          sig net.minecraft.world.entity.projectile.ProjectileUtil
+          sig net.minecraft.world.item.enchantment.Enchantments "BREACH|DENSITY"
+          sig net.minecraft.world.item.enchantment.ItemEnchantments "keySet|getLevel|EMPTY|entrySet|size"
+          sig net.minecraft.world.item.enchantment.EnchantmentHelper "getItemEnchantmentLevel|getTagEnchantmentLevel"
+          sig net.minecraft.core.component.DataComponents "ENCHANTMENTS"
+          sig net.minecraft.core.Holder " is\("
+          sig net.minecraft.world.item.ItemStack "getEnchantments|getOrDefault|isEnchanted| get\("
+          sig net.minecraft.world.item.Items "BOW;|CROSSBOW|TRIDENT;|SNOWBALL|EGG;|ENDER_PEARL|WIND_CHARGE|SPLASH_POTION|LINGERING_POTION|EXPERIENCE_BOTTLE|MACE;"
+          sig net.minecraft.world.entity.player.Player "getCooldowns"
+          sig net.minecraft.world.item.ItemCooldowns "isOnCooldown"
+          sig net.minecraft.client.player.KeyboardInput
+          code net.minecraft.client.player.KeyboardInput tick
+          code net.minecraft.world.item.WindChargeItem use
+          code net.minecraft.world.entity.projectile.Projectile shootFromRotation
+          sig net.minecraft.world.entity.projectile.arrow.AbstractArrow "getDefaultGravity|getWaterInertia|ARROW|class"
+          sig net.minecraft.world.entity.projectile.AbstractArrow "getDefaultGravity|getWaterInertia|class"
+          sig net.minecraft.world.entity.projectile.ThrowableProjectile "getDefaultGravity|class"
+          sig net.minecraft.world.entity.projectile.windcharge.WindCharge "class|getDefaultGravity|getInertia"
+          sig net.minecraft.world.entity.projectile.hurtingprojectile.windcharge.WindCharge "class|getDefaultGravity|getInertia"
+          sig net.minecraft.world.entity.projectile.AbstractHurtingProjectile "getInertia|getDefaultGravity|class"
+          unzip -l "$J" | awk '{print $4}' | grep -E "projectile/.*(AbstractArrow|ThrowableProjectile|WindCharge|AbstractHurtingProjectile|ThrownTrident|ProjectileUtil)\.class$" | head -20
+          sig net.minecraft.world.phys.EntityHitResult
+          sig net.minecraft.world.phys.Vec3 "add\(|scale\(|subtract\(|length\(|normalize|multiply\("
