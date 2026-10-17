@@ -16,6 +16,7 @@ import dev.kro.mc.feature.MaceSwapController;
 import dev.kro.mc.feature.NoClickDelayController;
 import dev.kro.mc.feature.ReachController;
 import dev.kro.mc.feature.ShortWindChargeController;
+import dev.kro.mc.feature.StretchResController;
 import dev.kro.mc.feature.TargetTracker;
 import dev.kro.mc.feature.TriggerbotController;
 import dev.kro.mc.feature.VelocityController;
@@ -67,6 +68,7 @@ public final class Kro implements ClientModInitializer {
 	public final ReachController reach = new ReachController(this);
 	public final FastPlaceController fastPlace = new FastPlaceController(this);
 	public final NoClickDelayController noClickDelay = new NoClickDelayController(this);
+	public final StretchResController stretchRes = new StretchResController(this);
 	public final WorldEffects effects = new WorldEffects(this);
 	public final KeyBinds keys = new KeyBinds(this);
 	public WallpaperTexture wallpaper;

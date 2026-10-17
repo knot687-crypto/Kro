@@ -30,21 +30,3 @@ jobs:
         with:
           name: kro-jar
           path: build/libs/*.jar
-
-      # Temporary: print exact 1.21.11 signatures used by new features
-      - name: API probe
-        if: always()
-        continue-on-error: true
-        run: |
-          set +e
-          J=$(find ~/.gradle/caches/fabric-loom -name "minecraft-merged*.jar" 2>/dev/null | grep "loom.mappings" | grep -v -i sources | grep -v intermediary | head -1)
-          echo "--- using $J"
-          sig() { echo "=== SIG $1"; javap -p -cp "$J" "$1" 2>&1 | grep -E -- "${2:-.}" || true; }
-          code() { echo "=== CODE $1 :: $2"; javap -p -c -cp "$J" "$1" 2>&1 | awk -v pat="$2(" 'index($0, pat) && !inm && $0 ~ /^  [a-z]/ {inm=1} inm {print} inm && /^$/ {inm=0}' || true; }
-          echo "=== perspective call sites"
-          unzip -l "$J" | awk '{print $4}' | grep -E '^(net/minecraft/client|com/mojang/blaze3d)/.*\.class$' | sed 's/\.class$//; s#/#.#g' | xargs -n 200 javap -p -c -cp "$J" 2>/dev/null | awk '/^(public |protected |private |final |abstract |static |sealed |non-sealed )*(class|interface|enum|record) / {cls=$0} /^  [a-zA-Z].*\(.*\)/ {m=$0} /Matrix4f\.(perspective|setPerspective)|setupPerspective/ {print cls "\n    in: " m "\n    at: " $0}' | head -80
-          sig net.minecraft.client.renderer.GameRenderer "rojection|Fov|fov|zoom|DepthFar|renderItemInHand|renderLevel"
-          code net.minecraft.client.renderer.GameRenderer getProjectionMatrix
-          echo "=== renderLevel projection use"; javap -p -c -cp "$J" net.minecraft.client.renderer.GameRenderer | awk '/ renderLevel\(/ {inm=1} inm {print} inm && /^$/ {exit}' | grep -n -E "rojection|perspective|getFov|Window\.get(Width|Height)|Frustum|setProjection" || true
-          echo "=== renderItemInHand projection use"; javap -p -c -cp "$J" net.minecraft.client.renderer.GameRenderer | awk '/ renderItemInHand\(/ {inm=1} inm {print} inm && /^$/ {exit}' | grep -n -E "rojection|perspective|getFov|Window\.get(Width|Height)|getBuffer" || true
-          for c in $(unzip -l "$J" | awk '{print $4}' | grep -E 'client/renderer/.*(Projection|Perspective)[A-Za-z]*\.class$' | sed 's/\.class$//; s#/#.#g'); do sig "$c"; done

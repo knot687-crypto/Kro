@@ -12,7 +12,7 @@ public final class StretchRes extends Module {
 	public final NumberSetting height = number("Height", "Height of the custom resolution.", 1080, 480, 2160, 10, "px");
 
 	public StretchRes() {
-		super("Stretch Res", "Plays like a stretched resolution: the world is drawn at a narrower ratio and stretched across your screen, so players look wider. Your HUD stays sharp.", Category.VISUAL, Icons.MAXIMIZE_2);
+		super("Stretch Res", "Plays like a stretched resolution: players look wider, and your HUD stays sharp.", Category.VISUAL, Icons.MAXIMIZE_2);
 		width.visibleWhen(() -> ratio.is("Custom"));
 		height.visibleWhen(() -> ratio.is("Custom"));
 	}

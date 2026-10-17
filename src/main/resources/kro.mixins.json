@@ -9,6 +9,7 @@
 		"EnvironmentAttributeProbeMixin",
 		"FlameFeatureRendererMixin",
 		"FogRendererMixin",
+		"GameRendererMixin",
 		"ItemInHandRendererMixin",
 		"KeyboardHandlerMixin",
 		"KeyMappingAccessor",
