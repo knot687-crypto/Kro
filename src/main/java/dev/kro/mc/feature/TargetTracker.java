@@ -56,6 +56,11 @@ public final class TargetTracker {
 		current = pick;
 	}
 
+	/** The opponent you are fighting right now, or null. */
+	public LivingEntity current() {
+		return current;
+	}
+
 	/** The current target snapshot, or null when there is nobody to show. */
 	public TargetInfo info() {
 		Minecraft mc = Minecraft.getInstance();

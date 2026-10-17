@@ -9,7 +9,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-/** Observes your attacks for the Target HUD and Hit Sparks. */
+/** Observes your attacks for the Target HUD, Hit Sparks and kill credit for Kill Effects. */
 @Mixin(MultiPlayerGameMode.class)
 public abstract class MultiPlayerGameModeMixin {
 	@Inject(method = "attack", at = @At("HEAD"))
@@ -18,6 +18,7 @@ public abstract class MultiPlayerGameModeMixin {
 		if (kro != null) {
 			kro.targets.onAttack(target);
 			kro.hitSparks.onAttack(target);
+			kro.effects.onAttack(target);
 		}
 	}
 }

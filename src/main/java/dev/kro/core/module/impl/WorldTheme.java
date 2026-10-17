@@ -45,7 +45,7 @@ public final class WorldTheme extends Module {
 	}
 
 	public WorldTheme() {
-		super("World Theme", "Restyles the sky, fog, time and ambience of the world. Visual only, just for you.", Category.VISUAL, Icons.SUN_MOON);
+		super("World Theme", "Restyles the sky, fog, time and ambience of the world. Visual only, just for you.", Category.WORLD, Icons.SUN_MOON);
 		time.visibleWhen(customTime::on);
 		skyColor.visibleWhen(() -> preset.is("Custom"));
 		fogColor.visibleWhen(() -> preset.is("Custom"));

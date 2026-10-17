@@ -40,7 +40,7 @@ public final class KroMenu {
 	private static final float RADIUS = 16f;
 	private static final float MAX_W = 744f;
 	private static final float MAX_H = 460f;
-	private static final String[] TABS = {"All", "Combat", "Movement", "Visual", "Client"};
+	private static final String[] TABS = {"All", "Combat", "Crystal", "Movement", "Visual", "World", "Client"};
 
 	private final ModuleRegistry modules;
 	private final UiHost host;
@@ -58,6 +58,8 @@ public final class KroMenu {
 	private final Anim searchHover = new Anim(0f, 16f);
 	private final Anim emptyAnim = new Anim(0f, 12f);
 	private final Anim statusSwap = new Anim(1f, 16f);
+	private final Anim gridScroll = new Anim(0f, 16f);
+	private final Anim gridBar = new Anim(0f, 8f);
 	private final Glass glass = new Glass();
 	private final long openedAt = Clock.nanos();
 
@@ -67,6 +69,7 @@ public final class KroMenu {
 	private boolean tabPlaced;
 	private boolean heightPlaced;
 	private String search = "";
+	private float gridScrollTarget;
 	private boolean searchFocused;
 	private boolean closing;
 	private boolean closed;
@@ -146,7 +149,7 @@ public final class KroMenu {
 	/** Centre of the {@code index}-th module card in GUI coordinates, for automation and previews. */
 	public float[] cardCentre(int index) {
 		ModuleCard card = cards.get(index);
-		return new float[] {(card.x.get() + card.w / 2f) * u, (card.y.get() + card.h / 2f) * u};
+		return new float[] {(card.x.get() + card.w / 2f) * u, (card.y.get() - card.scrollY + card.h / 2f) * u};
 	}
 
 	public void requestClose() {
@@ -345,19 +348,24 @@ public final class KroMenu {
 
 	private List<ModuleCard> filtered() {
 		List<ModuleCard> out = new ArrayList<>();
-		String q = search.toLowerCase(Locale.ROOT).trim();
+		String q = squash(search);
 		for (ModuleCard card : cards) {
 			Module m = card.module;
 			boolean inTab = tab == 0 || m.category().title().equals(TABS[tab]);
-			boolean matches = q.isEmpty() || m.name().toLowerCase(Locale.ROOT).contains(q)
-					|| m.category().title().toLowerCase(Locale.ROOT).contains(q)
-					|| m.description().toLowerCase(Locale.ROOT).contains(q);
+			boolean matches = q.isEmpty() || squash(m.name()).contains(q)
+					|| squash(m.category().title()).contains(q)
+					|| m.description().toLowerCase(Locale.ROOT).contains(search.toLowerCase(Locale.ROOT).trim());
 			card.shown = inTab && matches;
 			if (card.shown) {
 				out.add(card);
 			}
 		}
 		return out;
+	}
+
+	/** Lower case without spaces, so "autototem" finds Auto Totem. */
+	private static String squash(String s) {
+		return s.toLowerCase(Locale.ROOT).replace(" ", "");
 	}
 
 	private void renderContent(Canvas c, List<ModuleCard> list) {
@@ -397,6 +405,10 @@ public final class KroMenu {
 	private void renderGrid(Canvas c, List<ModuleCard> list, float top, float bottom, boolean interactive) {
 		float areaX = wx + SIDE, areaY = top + GRID_TOP;
 		float areaW = ww - SIDE * 2f;
+		float viewport = bottom - top;
+		float maxScroll = Math.max(0f, gridHeight(list.size()) - viewport);
+		gridScrollTarget = Math.max(0f, Math.min(maxScroll, gridScrollTarget));
+		float sc = gridScroll.to(gridScrollTarget).get();
 		int cols = 4;
 		float cw = (areaW - GAP * (cols - 1)) / cols;
 		float elapsed = (Clock.nanos() - openedAt) / 1.0e9f * Clock.speed();
@@ -424,6 +436,9 @@ public final class KroMenu {
 				card.placed = true;
 			}
 			boolean ready = elapsed >= card.delay;
+			card.scrollY = sc;
+			card.viewTop = top;
+			card.viewBottom = bottom;
 			card.visible.to(card.shown && ready ? 1f : 0f);
 			card.press.to(pressed == card ? 1f : 0f);
 			card.render(c, mouse, interactive && interactive(), glass);
@@ -440,6 +455,13 @@ public final class KroMenu {
 			} else {
 				status = "Open " + m.name() + " settings  ·  the switch toggles it";
 			}
+		}
+		if (maxScroll > 0.5f) {
+			boolean overGrid = interactive && mouse.in(wx, top, ww, viewport);
+			float bar = gridBar.to(overGrid ? 1f : 0.35f).get();
+			float barH = Math.max(28f, (viewport - 12f) * viewport / (viewport + maxScroll));
+			float barY = top + 6f + (viewport - 12f - barH) * (sc / maxScroll);
+			c.rect(wx + ww - 8f, barY, 3f, barH, 1.5f, Colors.withAlpha(0xFFFFFF, 0.08f + 0.16f * bar));
 		}
 		float empty = emptyAnim.to(list.isEmpty()).get();
 		if (empty > 0.01f) {
@@ -533,6 +555,7 @@ public final class KroMenu {
 	private void selectTab(int i) {
 		if (i != tab) {
 			tab = i;
+			gridScrollTarget = 0f;
 			host.sound("click");
 		}
 		closePage();
@@ -621,7 +644,11 @@ public final class KroMenu {
 
 	public boolean mouseScrolled(double gx, double gy, double amount) {
 		setMouse(gx, gy);
-		return page != null && page.mouseScrolled(mouse, amount);
+		if (page != null) {
+			return page.mouseScrolled(mouse, amount);
+		}
+		gridScrollTarget -= (float) amount * 42f;
+		return true;
 	}
 
 	public boolean keyPressed(int key, int mods, int menuKey) {
@@ -671,6 +698,7 @@ public final class KroMenu {
 		if (searchFocused && (Character.isLetterOrDigit(codepoint) || codepoint == ' ')) {
 			if (search.length() < 24) {
 				search += new String(Character.toChars(codepoint));
+				gridScrollTarget = 0f;
 			}
 			return true;
 		}

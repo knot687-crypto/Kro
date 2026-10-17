@@ -36,6 +36,11 @@ final class ModuleCard {
 	boolean shown = true;
 	float w;
 	float h;
+	/** How far the grid is scrolled; the card is drawn and hit-tested this much higher. */
+	float scrollY;
+	/** The visible band of the grid; cards fade as they slide out of it. */
+	float viewTop = -1.0e9f;
+	float viewBottom = 1.0e9f;
 	/** Seconds after opening before this card may appear (stagger). */
 	float delay;
 
@@ -45,24 +50,32 @@ final class ModuleCard {
 	}
 
 	boolean contains(Mouse m) {
-		return visible.get() > 0.5f && shown && m.in(x.get(), y.get(), w, h);
+		return visible.get() > 0.5f && shown && m.y >= viewTop && m.y <= viewBottom && m.in(x.get(), y.get() - scrollY, w, h);
+	}
+
+	/** Share of the card inside the visible band, 0..1. */
+	private float inView(float py) {
+		float cut = Math.min(py + h, viewBottom) - Math.max(py, viewTop);
+		return Math.max(0f, Math.min(1f, cut / h));
 	}
 
 	boolean overSwitch(Mouse m) {
 		if (module.alwaysOn()) {
 			return false;
 		}
-		float sx = x.get() + w - PAD - Draw.TOGGLE_W, sy = y.get() + TITLE_Y - Draw.TOGGLE_H / 2f;
+		float sx = x.get() + w - PAD - Draw.TOGGLE_W, sy = y.get() - scrollY + TITLE_Y - Draw.TOGGLE_H / 2f;
 		return m.in(sx - 6f, sy - 6f, Draw.TOGGLE_W + 12f, Draw.TOGGLE_H + 12f);
 	}
 
 	void render(Canvas c, Mouse m, boolean interactive, Glass glass) {
-		float vis = Math.max(0f, Math.min(1f, visible.get()));
+		float px = x.get(), py = y.get() - scrollY;
+		float edge = inView(py);
+		edge = edge * edge * (3f - 2f * edge);
+		float vis = Math.max(0f, Math.min(1f, visible.get())) * Math.min(1f, edge * 1.25f);
 		if (vis <= 0.01f) {
 			return;
 		}
-		float px = x.get(), py = y.get();
-		boolean over = interactive && shown && m.in(px, py, w, h);
+		boolean over = interactive && shown && contains(m);
 		float hv = hover.to(over).get();
 		float sw = switchHover.to(over && overSwitch(m)).get();
 		float onT = Math.max(0f, Math.min(1f, on.to(module.enabled() && !module.alwaysOn()).get()));

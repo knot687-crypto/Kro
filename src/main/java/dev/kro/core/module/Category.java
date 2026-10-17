@@ -4,8 +4,10 @@ import dev.kro.ui.render.Icons;
 
 public enum Category {
 	COMBAT("Combat", 0xFFF2768B, Icons.SWORDS),
+	CRYSTAL("Crystal", 0xFF63E2C6, Icons.ATOM),
 	MOVEMENT("Movement", 0xFF5CC2F2, Icons.WIND),
-	VISUAL("Visual", 0xFFB49CFF, Icons.SPARKLES),
+	VISUAL("Visual", 0xFFB49CFF, Icons.EYE),
+	WORLD("World", 0xFF9EE37D, Icons.SPARKLES),
 	CLIENT("Client", 0xFFF2C46B, Icons.SETTINGS);
 
 	private final String title;

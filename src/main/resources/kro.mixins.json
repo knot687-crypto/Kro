@@ -5,14 +5,18 @@
 	"compatibilityLevel": "JAVA_21",
 	"client": [
 		"ClientLevelDataMixin",
+		"ClientPacketListenerMixin",
 		"EnvironmentAttributeProbeMixin",
+		"FlameFeatureRendererMixin",
 		"FogRendererMixin",
+		"ItemInHandRendererMixin",
 		"KeyboardHandlerMixin",
 		"KeyMappingMixin",
 		"LevelMixin",
 		"MouseHandlerMixin",
 		"MultiPlayerGameModeMixin",
-		"OptionsMixin"
+		"OptionsMixin",
+		"ScreenEffectRendererMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

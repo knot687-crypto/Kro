@@ -10,15 +10,19 @@ import net.minecraft.client.renderer.rendertype.RenderSetup;
 import net.minecraft.client.renderer.rendertype.RenderType;
 import net.minecraft.resources.Identifier;
 
-/** Additive, depth-tested light for hit sparks; shapes are procedural in spark.fsh. */
+/** Additive, depth-tested light for Kro's world effects; shapes are procedural in spark.fsh. */
 public final class SparkPipelines {
 	private static final BlendFunction ADDITIVE = new BlendFunction(SourceFactor.ONE, DestFactor.ONE);
 
 	public static final RenderPipeline SPARK = base("spark").build();
 	public static final RenderPipeline RING = base("spark_ring").withShaderDefine("RING").build();
+	public static final RenderPipeline ORB = base("spark_orb").withShaderDefine("ORB").build();
+	public static final RenderPipeline BAND = base("spark_band").withShaderDefine("BAND").build();
 
 	public static final RenderType SPARK_TYPE = RenderType.create("kro_spark", RenderSetup.builder(SPARK).createRenderSetup());
 	public static final RenderType RING_TYPE = RenderType.create("kro_spark_ring", RenderSetup.builder(RING).createRenderSetup());
+	public static final RenderType ORB_TYPE = RenderType.create("kro_spark_orb", RenderSetup.builder(ORB).createRenderSetup());
+	public static final RenderType BAND_TYPE = RenderType.create("kro_spark_band", RenderSetup.builder(BAND).createRenderSetup());
 
 	private SparkPipelines() {
 	}

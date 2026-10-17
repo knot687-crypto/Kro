@@ -5,11 +5,15 @@ import dev.kro.core.config.ConfigIO;
 import dev.kro.core.module.Module;
 import dev.kro.core.module.ModuleRegistry;
 import dev.kro.mc.feature.AimAssistController;
+import dev.kro.mc.feature.AutoAnchorController;
+import dev.kro.mc.feature.AutoCrystalController;
+import dev.kro.mc.feature.AutoTotemController;
 import dev.kro.mc.feature.HitSparksController;
 import dev.kro.mc.feature.JumpResetController;
 import dev.kro.mc.feature.TargetTracker;
 import dev.kro.mc.feature.TriggerbotController;
 import dev.kro.mc.feature.WorldThemeController;
+import dev.kro.mc.fx.WorldEffects;
 import dev.kro.mc.hud.HudLayer;
 import dev.kro.mc.input.KeyBinds;
 import dev.kro.mc.render.WallpaperTexture;
@@ -44,6 +48,10 @@ public final class Kro implements ClientModInitializer {
 	public final JumpResetController jumpReset = new JumpResetController(this);
 	public final HitSparksController hitSparks = new HitSparksController(this);
 	public final WorldThemeController worldTheme = new WorldThemeController(this);
+	public final AutoCrystalController autoCrystal = new AutoCrystalController(this);
+	public final AutoAnchorController autoAnchor = new AutoAnchorController(this);
+	public final AutoTotemController autoTotem = new AutoTotemController(this);
+	public final WorldEffects effects = new WorldEffects(this);
 	public final KeyBinds keys = new KeyBinds(this);
 	public WallpaperTexture wallpaper;
 	private final HudLayer hud = new HudLayer(this);
@@ -73,6 +81,8 @@ public final class Kro implements ClientModInitializer {
 		ClientTickEvents.END_CLIENT_TICK.register(this::endTick);
 		HudElementRegistry.addLast(Identifier.fromNamespaceAndPath(MOD_ID, "hud"), hud::render);
 		WorldRenderEvents.BEFORE_TRANSLUCENT.register(hitSparks::renderWorld);
+		WorldRenderEvents.END_EXTRACTION.register(ctx -> effects.capture(ctx.tickCounter().getGameTimeDeltaPartialTick(false)));
+		WorldRenderEvents.BEFORE_TRANSLUCENT.register(effects::render);
 		ClientLifecycleEvents.CLIENT_STOPPING.register(client -> save());
 		LOGGER.info("Kro ready");
 	}
@@ -80,6 +90,9 @@ public final class Kro implements ClientModInitializer {
 	private void startTick(Minecraft mc) {
 		applyInterface();
 		jumpReset.startTick(mc);
+		autoTotem.tick(mc);
+		autoAnchor.tick(mc);
+		autoCrystal.tick(mc);
 		triggerbot.tick(mc);
 		worldTheme.tick(mc);
 		targets.tick(mc);
@@ -87,6 +100,7 @@ public final class Kro implements ClientModInitializer {
 
 	private void endTick(Minecraft mc) {
 		jumpReset.endTick(mc);
+		effects.tick(mc);
 		if (modules.ui.window.is("Picture")) {
 			// keeps the picture decoded and sized for the current window, off the render thread
 			KroScreen.picture(mc);

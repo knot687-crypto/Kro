@@ -20,7 +20,7 @@ public final class HitSparks extends Module {
 	public final BoolSetting critsOnly = bool("Crits only", "Only spark on critical hits.", false);
 
 	public HitSparks() {
-		super("Hit Sparks", "Beautiful glowing sparks burst from every hit you land.", Category.VISUAL, Icons.SPARKLES);
+		super("Hit Sparks", "Beautiful glowing sparks burst from every hit you land.", Category.WORLD, Icons.SPARKLES);
 		palette.visibleWhen(() -> style.is("Glow"));
 		customColor.visibleWhen(() -> style.is("Glow") && palette.is("Custom"));
 		size.visibleWhen(() -> style.is("Glow"));
