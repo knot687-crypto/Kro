@@ -127,7 +127,7 @@ public final class PreviewFx {
 		list.add(new Scene("pop", near, chest, new double[] {0.12, 0.38, 0.75, 1.25}, single(() -> {
 			Dummy d = new Dummy(t -> new double[] {0, 0, 0});
 			int[] c = Effects.popColors("Totem", 0);
-			return Effects.pop(d, c[0], c[1], 1.0);
+			return Effects.pop(d, c[0], c[1], 1.0, false);
 		})));
 		list.add(new Scene("lightning", new double[] {5.0, 3.0, -12.0}, new double[] {0.0, 7.0, 0.0}, new double[] {0.04, 0.2, 0.32, 0.6},
 				single(() -> Effects.lightning(0, 0, 0, Theme.accent()))));

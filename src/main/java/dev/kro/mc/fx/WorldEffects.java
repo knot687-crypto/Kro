@@ -128,7 +128,9 @@ public final class WorldEffects {
 		PopEffects m = kro.modules.popEffects;
 		if (m.enabled() && popShownFor(m, entity) && entity instanceof LivingEntity) {
 			int[] colors = Effects.popColors(m.palette.get(), m.customColor.color());
-			effects.add(Effects.pop(new EntityAnchor(entity), colors[0], colors[1], m.scale.value()));
+			Minecraft mc = Minecraft.getInstance();
+			boolean viewer = entity == mc.player && mc.options.getCameraType().isFirstPerson();
+			effects.add(Effects.pop(new EntityAnchor(entity), colors[0], colors[1], m.scale.value(), viewer));
 		}
 	}
 

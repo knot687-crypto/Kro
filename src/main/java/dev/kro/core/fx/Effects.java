@@ -59,8 +59,12 @@ public final class Effects {
 		};
 	}
 
-	public static Effect pop(Anchor who, int a, int b, double scale) {
-		return new PopBurst(who, a, b, scale);
+	/**
+	 * @param viewer true when it is your own pop seen in first person: the burst then keeps clear
+	 *               of the camera (no pillar or halo through your eyes, motes at a wider radius)
+	 */
+	public static Effect pop(Anchor who, int a, int b, double scale, boolean viewer) {
+		return new PopBurst(who, a, b, scale, viewer);
 	}
 
 	public static Effect lightning(double x, double y, double z, int color) {
@@ -199,10 +203,12 @@ public final class Effects {
 		double ly;
 		double lz;
 		final Sparks sparks;
+		final boolean viewer;
 		final double spin = ThreadLocalRandom.current().nextDouble(Math.PI * 2.0);
 
-		PopBurst(Anchor who, int a, int b, double scale) {
+		PopBurst(Anchor who, int a, int b, double scale, boolean viewer) {
 			this.who = who;
+			this.viewer = viewer;
 			this.a = a;
 			this.b = b;
 			this.scale = scale;
@@ -251,7 +257,7 @@ public final class Effects {
 
 			// a pillar of light that flares and fades
 			double pp = age / 0.7;
-			if (pp < 1.0) {
+			if (pp < 1.0 && !viewer) {
 				double f = pulse(pp, 0.12);
 				double w = (0.85 * (1.0 - pp) + 0.22) * scale;
 				double top = ly + 3.8 * scale;
@@ -268,7 +274,7 @@ public final class Effects {
 				}
 				double strand = (i % 2) * Math.PI;
 				double ang = spin + strand + (double) i / MOTES * Math.PI * 4.0 + q * 3.4;
-				double rad = (width * 0.75 + 0.2 + 0.35 * q) * scale;
+				double rad = (viewer ? 1.35 + 0.3 * q : width * 0.75 + 0.2 + 0.35 * q) * scale;
 				double y = ly + (0.08 + (height + 0.9) * outCubic(q)) * scale;
 				double f = Math.pow(Math.sin(q * Math.PI), 0.8);
 				int col = Fx.lerpColor(a, b, (float) i / MOTES);
@@ -282,7 +288,7 @@ public final class Effects {
 
 			// a halo blooming at head height
 			double ph = age / 0.5;
-			if (ph < 1.0) {
+			if (ph < 1.0 && !viewer) {
 				fx.halo(lx, ly + height * 0.92, lz, (0.3 + 1.3 * outCubic(ph)) * scale, Fx.fade(a, Math.pow(1.0 - ph, 2.0) * 0.9));
 			}
 			sparks.draw(fx, dt, 1.0);

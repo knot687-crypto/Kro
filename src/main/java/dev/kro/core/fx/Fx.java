@@ -18,6 +18,8 @@ public final class Fx {
 
 	/** Primitives further than this from the camera are skipped. */
 	private static final double MAX_DISTANCE_SQ = 160.0 * 160.0;
+	/** Light this close to the eye would wash over the whole screen, so it is skipped. */
+	private static final double NEAR = 0.35;
 
 	/** Receives a frame's geometry: per vertex x, y, z (camera relative), u, v and an ARGB colour. */
 	public interface Sink {
@@ -173,6 +175,9 @@ public final class Fx {
 			return;
 		}
 		double dx = bx - ax, dy = by - ay, dz = bz - az;
+		if (nearCamera(ax, ay, az, dx, dy, dz, Math.max(w1, w2) + NEAR)) {
+			return;
+		}
 		double mx = (ax + bx) * 0.5, my = (ay + by) * 0.5, mz = (az + bz) * 0.5;
 		double sx = dy * mz - dz * my, sy = dz * mx - dx * mz, sz = dx * my - dy * mx;
 		double sl = Math.sqrt(sx * sx + sy * sy + sz * sz);
@@ -265,7 +270,7 @@ public final class Fx {
 		}
 		double px = x - cx, py = y - cy, pz = z - cz;
 		double len2 = px * px + py * py + pz * pz;
-		if (len2 > MAX_DISTANCE_SQ || len2 < 1.0e-8) {
+		if (len2 > MAX_DISTANCE_SQ || len2 < (radius + NEAR) * (radius + NEAR) * 0.5) {
 			return;
 		}
 		double len = Math.sqrt(len2);
@@ -290,6 +295,14 @@ public final class Fx {
 		batch.vertex(px + rx - ux, py - uy, pz + rz - uz, 1f, -1f, argb);
 		batch.vertex(px + rx + ux, py + uy, pz + rz + uz, 1f, 1f, argb);
 		batch.vertex(px - rx + ux, py + uy, pz - rz + uz, -1f, 1f, argb);
+	}
+
+	/** Whether the camera (the origin) lies within {@code reach} of the segment from a along d. */
+	private static boolean nearCamera(double ax, double ay, double az, double dx, double dy, double dz, double reach) {
+		double len2 = dx * dx + dy * dy + dz * dz;
+		double t = len2 < 1.0e-12 ? 0.0 : Math.max(0.0, Math.min(1.0, -(ax * dx + ay * dy + az * dz) / len2));
+		double qx = ax + dx * t, qy = ay + dy * t, qz = az + dz * t;
+		return qx * qx + qy * qy + qz * qz < reach * reach;
 	}
 
 	/** Hands everything collected this frame to {@code sink} and clears it. */
