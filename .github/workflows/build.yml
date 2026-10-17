@@ -30,26 +30,3 @@ jobs:
         with:
           name: kro-jar
           path: build/libs/*.jar
-
-      # Temporary: print exact 1.21.11 signatures used by new features
-      - name: API probe
-        if: always()
-        continue-on-error: true
-        run: |
-          set +e
-          J=$(find ~/.gradle/caches/fabric-loom -name "minecraft-merged*.jar" 2>/dev/null | grep "loom.mappings" | grep -v -i sources | grep -v intermediary | head -1)
-          echo "--- using $J"
-          sig() { echo "=== SIG $1"; javap -p -cp "$J" "$1" 2>&1 | grep -E -- "${2:-.}" || true; }
-          code() { echo "=== CODE $1 :: $2"; javap -p -c -cp "$J" "$1" 2>&1 | awk -v pat="$2(" 'index($0, pat) && !inm && $0 ~ /^  [a-z]/ {inm=1} inm {print} inm && /^$/ {inm=0}' || true; }
-          code net.minecraft.client.player.LocalPlayer raycastHitResult
-          code net.minecraft.world.entity.player.Player raycastHitResult
-          code net.minecraft.world.entity.LivingEntity raycastHitResult
-          code net.minecraft.world.item.component.AttackRange defaultFor
-          code net.minecraft.world.item.component.AttackRange effectiveMaxRange
-          code net.minecraft.world.item.component.AttackRange effectiveMinRange
-          code net.minecraft.world.item.component.AttackRange getClosesetHit
-          code net.minecraft.world.entity.player.Player isWithinAttackRange
-          code net.minecraft.network.protocol.game.ServerboundInteractPacket isWithinRange
-          sig net.minecraft.client.player.LocalPlayer "raycast|pick"
-          sig net.minecraft.world.entity.LivingEntity "getActiveItem|getWeaponItem|attackRange|AttackRange"
-          sig net.minecraft.client.renderer.GameRenderer "filterHitResult| pick\\("
