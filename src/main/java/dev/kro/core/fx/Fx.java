@@ -1,36 +1,42 @@
-package dev.kro.mc.fx;
-
-import com.mojang.blaze3d.vertex.VertexConsumer;
-import dev.kro.mc.render.SparkPipelines;
-import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.client.renderer.rendertype.RenderType;
-import net.minecraft.world.phys.Vec3;
-import org.joml.Matrix4f;
+package dev.kro.core.fx;
 
 import java.util.Arrays;
 
 /**
  * Kro's in-world light. Effects describe glowing primitives (soft orbs, halos, ribbons of light,
- * rings laid on the ground, spark streaks) in world coordinates; they are collected per shape and
- * drawn in one additive batch each, relative to the camera, after the opaque world.
+ * rings laid on the ground, spark streaks) in world coordinates; they are collected per shape,
+ * relative to the camera, and handed to a {@link Sink} that draws each shape in one additive
+ * batch with the matching procedural shader (spark.fsh). Free of game code, so the very same
+ * effects can be rendered offline.
  */
 public final class Fx {
+	/** Shape ids, matching the spark.fsh variants: BAND, RING, ORB and the plain spark streak. */
+	public static final int BAND = 0;
+	public static final int HALO = 1;
+	public static final int ORB = 2;
+	public static final int STREAK = 3;
+
 	/** Primitives further than this from the camera are skipped. */
 	private static final double MAX_DISTANCE_SQ = 160.0 * 160.0;
 
-	private final Batch orbs = new Batch(SparkPipelines.ORB_TYPE);
-	private final Batch bands = new Batch(SparkPipelines.BAND_TYPE);
-	private final Batch halos = new Batch(SparkPipelines.RING_TYPE);
-	private final Batch streaks = new Batch(SparkPipelines.SPARK_TYPE);
+	/** Receives a frame's geometry: per vertex x, y, z (camera relative), u, v and an ARGB colour. */
+	public interface Sink {
+		void draw(int shape, float[] data, int[] colors, int vertices);
+	}
+
+	private final Batch bands = new Batch(BAND);
+	private final Batch halos = new Batch(HALO);
+	private final Batch orbs = new Batch(ORB);
+	private final Batch streaks = new Batch(STREAK);
 	private double cx;
 	private double cy;
 	private double cz;
 
-	/** Starts a frame seen from {@code camera}. */
-	public void begin(Vec3 camera) {
-		cx = camera.x;
-		cy = camera.y;
-		cz = camera.z;
+	/** Starts a frame seen from the camera at (x, y, z). */
+	public void begin(double x, double y, double z) {
+		cx = x;
+		cy = y;
+		cz = z;
 	}
 
 	public double cameraX() {
@@ -80,6 +86,74 @@ public final class Fx {
 			bands.vertex(px + c0 * outer, py, pz + s0 * outer, 1f, 0f, col0);
 			bands.vertex(px + c1 * outer, py, pz + s1 * outer, 1f, 0f, col1);
 			bands.vertex(px + c1 * inner, py, pz + s1 * inner, -1f, 0f, col1);
+			c0 = c1;
+			s0 = s1;
+			col0 = col1;
+		}
+	}
+
+	/** A soft round pool of light lying flat at height {@code y}, brightest at its centre. */
+	public void groundGlow(double x, double y, double z, double radius, int argb) {
+		if ((argb >>> 24) == 0 || radius <= 0.0) {
+			return;
+		}
+		double px = x - cx, py = y - cy, pz = z - cz;
+		if (px * px + py * py + pz * pz > MAX_DISTANCE_SQ) {
+			return;
+		}
+		orbs.vertex(px - radius, py, pz - radius, -1f, -1f, argb);
+		orbs.vertex(px + radius, py, pz - radius, 1f, -1f, argb);
+		orbs.vertex(px + radius, py, pz + radius, 1f, 1f, argb);
+		orbs.vertex(px - radius, py, pz + radius, -1f, 1f, argb);
+	}
+
+	/**
+	 * A wall of light standing on a path: crisp and brightest along the path itself, fading out
+	 * toward its top edge. Each point has its own height (which may be negative, so the wall hangs
+	 * below) and colour.
+	 */
+	public void curtain(double[] xs, double[] ys, double[] zs, double[] heights, int[] colors, int n) {
+		for (int i = 0; i < n - 1; i++) {
+			int j = i + 1;
+			if ((colors[i] >>> 24) == 0 && (colors[j] >>> 24) == 0) {
+				continue;
+			}
+			double ax = xs[i] - cx, ay = ys[i] - cy, az = zs[i] - cz;
+			double bx = xs[j] - cx, by = ys[j] - cy, bz = zs[j] - cz;
+			if (ax * ax + ay * ay + az * az > MAX_DISTANCE_SQ) {
+				continue;
+			}
+			bands.vertex(ax, ay, az, 0f, 0f, colors[i]);
+			bands.vertex(bx, by, bz, 0f, 0f, colors[j]);
+			bands.vertex(bx, by + heights[j], bz, 1f, 0f, colors[j]);
+			bands.vertex(ax, ay + heights[i], az, 1f, 0f, colors[i]);
+		}
+	}
+
+	/**
+	 * A ring of light at {@code y} trailing a cylinder of fading light to {@code tailY} (above or
+	 * below), its colour sweeping from {@code a} to {@code b} around the circle.
+	 */
+	public void cylinder(double x, double y, double z, double radius, double tailY, int a, int b, double phase) {
+		if ((a >>> 24) == 0 && (b >>> 24) == 0 || radius <= 0.0) {
+			return;
+		}
+		double px = x - cx, py = y - cy, pz = z - cz, ty = tailY - cy;
+		if (px * px + py * py + pz * pz > MAX_DISTANCE_SQ) {
+			return;
+		}
+		int segments = Math.max(24, Math.min(96, (int) (radius * 40.0)));
+		double step = Math.PI * 2.0 / segments;
+		double c0 = 1.0, s0 = 0.0;
+		int col0 = sweep(a, b, phase);
+		for (int i = 1; i <= segments; i++) {
+			double ang = i * step;
+			double c1 = Math.cos(ang), s1 = Math.sin(ang);
+			int col1 = sweep(a, b, ang + phase);
+			bands.vertex(px + c0 * radius, py, pz + s0 * radius, 0f, 0f, col0);
+			bands.vertex(px + c1 * radius, py, pz + s1 * radius, 0f, 0f, col1);
+			bands.vertex(px + c1 * radius, ty, pz + s1 * radius, 1f, 0f, col1);
+			bands.vertex(px + c0 * radius, ty, pz + s0 * radius, 1f, 0f, col0);
 			c0 = c1;
 			s0 = s1;
 			col0 = col1;
@@ -218,12 +292,12 @@ public final class Fx {
 		batch.vertex(px - rx + ux, py + uy, pz - rz + uz, -1f, 1f, argb);
 	}
 
-	/** Draws everything collected this frame and clears it. */
-	public void flush(Matrix4f pose, MultiBufferSource consumers) {
-		bands.flush(pose, consumers);
-		halos.flush(pose, consumers);
-		orbs.flush(pose, consumers);
-		streaks.flush(pose, consumers);
+	/** Hands everything collected this frame to {@code sink} and clears it. */
+	public void flush(Sink sink) {
+		bands.flush(sink);
+		halos.flush(sink);
+		orbs.flush(sink);
+		streaks.flush(sink);
 	}
 
 	public static int lerpColor(int a, int b, float t) {
@@ -245,13 +319,13 @@ public final class Fx {
 
 	/** Camera-relative vertices of one shape, emitted in one go. */
 	private static final class Batch {
-		private final RenderType type;
+		private final int shape;
 		private float[] pos = new float[4 * 5 * 64];
 		private int[] colors = new int[4 * 64];
 		private int count;
 
-		Batch(RenderType type) {
-			this.type = type;
+		Batch(int shape) {
+			this.shape = shape;
 		}
 
 		void vertex(double x, double y, double z, float u, float v, int argb) {
@@ -269,18 +343,11 @@ public final class Fx {
 			count++;
 		}
 
-		void flush(Matrix4f pose, MultiBufferSource consumers) {
+		void flush(Sink sink) {
 			if (count == 0) {
 				return;
 			}
-			VertexConsumer vc = consumers.getBuffer(type);
-			for (int i = 0; i < count; i++) {
-				int o = i * 5;
-				vc.addVertex(pose, pos[o], pos[o + 1], pos[o + 2]).setUv(pos[o + 3], pos[o + 4]).setColor(colors[i]);
-			}
-			if (consumers instanceof MultiBufferSource.BufferSource bs) {
-				bs.endBatch(type);
-			}
+			sink.draw(shape, pos, colors, count);
 			count = 0;
 		}
 	}

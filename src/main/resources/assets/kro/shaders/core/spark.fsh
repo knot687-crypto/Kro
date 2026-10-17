@@ -30,13 +30,13 @@ void main() {
     float glow = exp(-r * r * 4.2) * smoothstep(1.0, 0.72, r);
     float core = exp(-r * r * 30.0);
     float intensity = glow + core * 0.65;
-    vec3 rgb = mix(vColor.rgb, vec3(1.0), clamp(core * 0.85, 0.0, 1.0));
+    vec3 rgb = mix(vColor.rgb, vec3(1.0), clamp(core * 0.7, 0.0, 1.0));
 #elif defined(BAND)
     float x = vUv.x;
     float glow = exp(-x * x * 3.4) * smoothstep(1.0, 0.78, abs(x));
     float core = exp(-x * x * 26.0);
     float intensity = glow * 0.8 + core * 0.6;
-    vec3 rgb = mix(vColor.rgb, vec3(1.0), clamp(core * 0.75, 0.0, 1.0));
+    vec3 rgb = mix(vColor.rgb, vec3(1.0), clamp(core * 0.5, 0.0, 1.0));
 #else
     float across = exp(-vUv.x * vUv.x * 5.5);
     float along = clamp(vUv.y * 0.5 + 0.5, 0.0, 1.0);
