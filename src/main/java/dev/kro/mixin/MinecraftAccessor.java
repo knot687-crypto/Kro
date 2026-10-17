@@ -14,5 +14,8 @@ public interface MinecraftAccessor {
 	void kro$setRightClickDelay(int ticks);
 
 	@Accessor("missTime")
+	int kro$missTime();
+
+	@Accessor("missTime")
 	void kro$setMissTime(int ticks);
 }

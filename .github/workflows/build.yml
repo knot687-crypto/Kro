@@ -41,13 +41,15 @@ jobs:
           echo "--- using $J"
           sig() { echo "=== SIG $1"; javap -p -cp "$J" "$1" 2>&1 | grep -E -- "${2:-.}" || true; }
           code() { echo "=== CODE $1 :: $2"; javap -p -c -cp "$J" "$1" 2>&1 | awk -v pat="$2(" 'index($0, pat) && !inm && $0 ~ /^  [a-z]/ {inm=1} inm {print} inm && /^$/ {inm=0}' || true; }
-          sig net.minecraft.client.Minecraft "rightClickDelay|missTime| startAttack| startUseItem| continueAttack"
-          code net.minecraft.client.Minecraft startAttack
-          echo "=== Minecraft.tick timers"; javap -p -c -cp "$J" net.minecraft.client.Minecraft | awk '/^  public void tick\(\);/ {inm=1} inm {print} inm && /^$/ {exit}' | grep -n -E "rightClickDelay|missTime|handleKeybinds|startAttack|startUseItem|continueAttack" || true
-          echo "=== Minecraft.handleKeybinds timers"; javap -p -c -cp "$J" net.minecraft.client.Minecraft | awk '/ handleKeybinds\(\);/ {inm=1} inm {print} inm && /^$/ {exit}' | grep -n -E "rightClickDelay|missTime|startAttack|startUseItem|continueAttack|isDown|consumeClick" || true
-          echo "=== Minecraft.startUseItem timers"; javap -p -c -cp "$J" net.minecraft.client.Minecraft | awk '/ startUseItem\(\);/ {inm=1} inm {print} inm && /^$/ {exit}' | grep -n -E "rightClickDelay|bipush|iconst" | head -8 || true
-          code net.minecraft.client.renderer.GameRenderer pick
-          sig net.minecraft.world.entity.player.Player "InteractionRange|canInteractWith|AttackRange|attackRange"
-          code net.minecraft.world.entity.player.Player entityInteractionRange
-          sig net.minecraft.world.item.component.AttackRange
-          echo "=== server attack check"; javap -p -c -cp "$J" net.minecraft.server.network.ServerGamePacketListenerImpl | awk '/ handleInteract\(/ {inm=1} inm {print} inm && /^$/ {exit}' | grep -E "invoke|ldc|dconst" | head -30 || true
+          code net.minecraft.client.player.LocalPlayer raycastHitResult
+          code net.minecraft.world.entity.player.Player raycastHitResult
+          code net.minecraft.world.entity.LivingEntity raycastHitResult
+          code net.minecraft.world.item.component.AttackRange defaultFor
+          code net.minecraft.world.item.component.AttackRange effectiveMaxRange
+          code net.minecraft.world.item.component.AttackRange effectiveMinRange
+          code net.minecraft.world.item.component.AttackRange getClosesetHit
+          code net.minecraft.world.entity.player.Player isWithinAttackRange
+          code net.minecraft.network.protocol.game.ServerboundInteractPacket isWithinRange
+          sig net.minecraft.client.player.LocalPlayer "raycast|pick"
+          sig net.minecraft.world.entity.LivingEntity "getActiveItem|getWeaponItem|attackRange|AttackRange"
+          sig net.minecraft.client.renderer.GameRenderer "filterHitResult| pick\\("
